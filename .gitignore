@@ -32,3 +32,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local-only scripts with embedded DB password
+scripts/pg_*.py
+
+# Local-only env
+.env
+.env.local
