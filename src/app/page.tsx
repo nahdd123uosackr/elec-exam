@@ -273,6 +273,14 @@ export default function Home() {
                         {problem.난이도}
                       </span>
                     )}
+                    {problem.중복출제 && (
+                      <span
+                        className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-medium"
+                        title={`이 문제는 다음 회차에도 출제되었습니다: ${problem.중복출제}`}
+                      >
+                        🔁 중복 · {problem.중복출제}
+                      </span>
+                    )}
                   </div>
                 </div>
 
