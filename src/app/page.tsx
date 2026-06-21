@@ -6,15 +6,40 @@ import type { Problem } from '../types/Problem'
 type SortKey = '회차' | '과목' | '문제번호'
 
 /**
- * "[이미지: /images/xxx.gif]" 또는 "[이미지: https://...]" 패턴을
- * <img> 태그로 변환해 JSX 노드 배열로 반환.
+ * "[이미지: /images/xxx.gif]" → <img>
+ * "[이미지: \LaTeX...]"      → 모노 텍스트 (향후 KaTeX 대응 가능)
+ * "🖼️"                      → 배지 표시 (원본에 이미지 없음)
  */
 function renderWithImages(text: string): React.ReactNode {
-  const parts = text.split(/(\[이미지:\s*[^\]]+\])/g)
+  // 🖼️ placeholder 먼저 처리
+  const parts = text.split(/(🖼️|\[이미지:\s*[^\]]+\])/g)
   return parts.map((part, i) => {
+    if (part === '🖼️') {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 align-middle"
+          title="원본 이미지 없음"
+        >
+          🖼️ 이미지
+        </span>
+      )
+    }
     const m = part.match(/\[이미지:\s*([^\]]+)\]/)
     if (m) {
       const src = m[1].trim()
+      // LaTeX 수식 (백슬래시로 시작하거나 \frac, \left 등 포함)
+      if (src.includes('\\') || src.includes('frac') || src.includes('left')) {
+        return (
+          <code
+            key={i}
+            className="inline-block bg-blue-50 text-blue-700 text-xs px-1 py-0.5 rounded align-middle font-mono"
+            title={src}
+          >
+            {src.length > 40 ? src.slice(0, 40) + '…' : src}
+          </code>
+        )
+      }
       return (
         <img
           key={i}
