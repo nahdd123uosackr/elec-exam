@@ -1,9 +1,33 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import type { Problem } from '../types/Problem'
 
 type SortKey = '회차' | '과목' | '문제번호'
+
+/**
+ * "[이미지: /images/xxx.gif]" 또는 "[이미지: https://...]" 패턴을
+ * <img> 태그로 변환해 JSX 노드 배열로 반환.
+ */
+function renderWithImages(text: string): React.ReactNode {
+  const parts = text.split(/(\[이미지:\s*[^\]]+\])/g)
+  return parts.map((part, i) => {
+    const m = part.match(/\[이미지:\s*([^\]]+)\]/)
+    if (m) {
+      const src = m[1].trim()
+      return (
+        <img
+          key={i}
+          src={src}
+          alt="수식 이미지"
+          className="inline-block max-h-16 align-middle mx-1"
+          loading="lazy"
+        />
+      )
+    }
+    return <span key={i}>{part}</span>
+  })
+}
 
 /** "① 내용" / "1. 내용" / "(1) 내용" → [1, "내용"] 형태로 정규화 */
 function parseChoice(raw: string, idx: number): { num: number; text: string; label: string } {
@@ -285,7 +309,7 @@ export default function Home() {
                 </div>
 
                 <h2 className="text-lg font-medium text-gray-900 leading-relaxed mb-3 whitespace-pre-line">
-                  {problem.문제}
+                  {renderWithImages(problem.문제)}
                 </h2>
 
                 {/* 보기 영역 */}
@@ -318,7 +342,7 @@ export default function Home() {
                           className={btnClass}
                         >
                           <span className="font-bold shrink-0 mt-0.5">{choice.label}</span>
-                          <span className="flex-1">{choice.text}</span>
+                          <span className="flex-1">{renderWithImages(choice.text)}</span>
                           {isAnswered && isCorrectChoice && (
                             <span className="shrink-0 text-xs font-bold text-green-700">정답</span>
                           )}
@@ -371,7 +395,7 @@ export default function Home() {
                     {problem.해설 && (
                       <div className="rounded-md bg-gray-50 border border-gray-200 p-3 text-sm text-gray-800 whitespace-pre-line">
                         <div className="text-xs font-semibold text-gray-500 mb-1">해설</div>
-                        {problem.해설}
+                        {renderWithImages(problem.해설)}
                       </div>
                     )}
 
