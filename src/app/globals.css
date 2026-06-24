@@ -6,18 +6,45 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
 }
 
-.problem-card {
-  @apply bg-white border border-gray-200 rounded-lg p-6 mb-4 shadow-sm hover:shadow-md transition-shadow;
+/* 챗봇 영역: 메인 콘텐츠와 분리된 고정 패널 */
+.chat-panel {
+  @apply flex flex-col h-full;
 }
 
-.option-btn {
-  @apply w-full text-left px-4 py-3 border rounded-lg mb-2 hover:bg-blue-50 hover:border-blue-300 transition-colors;
+.chat-messages {
+  @apply flex-1 overflow-y-auto p-4 space-y-3;
+  min-height: 0;
 }
 
-.option-btn.correct {
-  @apply bg-green-50 border-green-500 text-green-700;
+.chat-input-area {
+  @apply border-t border-gray-200 p-3 bg-white;
 }
 
-.option-btn.incorrect {
-  @apply bg-red-50 border-red-500 text-red-700;
+/* 문제 영역 스크롤 */
+.problems-scroll {
+  @apply overflow-y-auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 랜딩 카드 */
+.menu-card {
+  @apply bg-white rounded-2xl border border-gray-200 p-6 shadow-sm 
+         hover:shadow-lg hover:border-blue-300 transition-all duration-200 
+         cursor-pointer flex flex-col items-center text-center gap-3;
+}
+
+.menu-card:hover {
+  transform: translateY(-2px);
+}
+
+/* 모바일 챗봇 토글 */
+@media (max-width: 768px) {
+  .chat-overlay {
+    @apply fixed inset-x-0 bottom-0 z-50 bg-white border-t border-gray-300 shadow-2xl;
+    height: 60vh;
+  }
+  .chat-overlay.hidden {
+    display: none;
+  }
 }
