@@ -65,11 +65,11 @@ export default function Home() {
             </div>
           </Link>
 
-          <Link href="/dup-low" className="menu-card group">
-            <div className="text-4xl">📖</div>
+          <Link href="/dup-two" className="menu-card group">
+            <div className="text-4xl">🕑</div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition">3회 미만 출제 문제</h2>
-              <p className="text-sm text-gray-500 mt-1">한 번 또는 두 번만 출제된 문제 도전</p>
+              <h2 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition">2회 출제 문제</h2>
+              <p className="text-sm text-gray-500 mt-1">딱 한 번 더 출제된 문제로 실력 확인</p>
             </div>
           </Link>
         </div>

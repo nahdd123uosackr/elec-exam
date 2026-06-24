@@ -7,7 +7,7 @@ import ProblemCard from './ProblemCard'
 import ChatBot from './ChatBot'
 
 interface FilterConfig {
-  type: 'cycle' | 'subject' | 'dup-high' | 'dup-low'
+  type: 'cycle' | 'subject' | 'dup-high' | 'dup-two'
   title: string
   subtitle: string
   icon: string
@@ -51,12 +51,12 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
         if (!p.중복출제) return false
         return p.중복출제.split(',').length >= 2  // 3회 이상 출제
       })
-    } else if (config.type === 'dup-low') {
-      list = list.filter(p => {
-        const dupCount = p.중복출제 ? p.중복출제.split(',').length : 0
-        return dupCount < 2  // 3회 미만
-      })
-    }
+    } else if (config.type === 'dup-two') {
+   list = list.filter(p => {
+     if (!p.중복출제) return false
+     return p.중복출제.split(',').length === 1  // 정확히 2회 출제
+   })
+ }
 
     // 사용자 필터
     if (selectedCycle !== 'all') list = list.filter(p => p.회차 === selectedCycle)
@@ -117,7 +117,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
 
           {/* 필터 */}
           <div className="flex-1 flex items-center gap-3 overflow-x-auto">
-            {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-low') && (
+            {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-two') && (
               <select value={selectedCycle} onChange={e => setSelectedCycle(e.target.value)}
                 className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm shrink-0">
                 <option value="all">전체 회차</option>
@@ -125,7 +125,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
               </select>
             )}
 
-            {(config.type === 'subject' || config.type === 'dup-high' || config.type === 'dup-low') && (
+            {(config.type === 'subject' || config.type === 'dup-high' || config.type === 'dup-two') && (
               <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}
                 className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm shrink-0">
                 <option value="all">전체 과목</option>
