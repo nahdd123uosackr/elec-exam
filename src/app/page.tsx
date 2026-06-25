@@ -30,10 +30,13 @@ export default function Home() {
         </p>
         {stats && (
           <div className="flex justify-center gap-6 mt-6 text-sm text-gray-500">
-            <span>📝 <strong className="text-gray-900">{stats.total.toLocaleString()}</strong>문제</span>
-            <span>📅 <strong className="text-gray-900">{stats.cycles}</strong>회차</span>
-            <span>📚 <strong className="text-gray-900">{stats.subjects}</strong>과목</span>
+            <span>📝 <strong className="text-gray-900">{(stats.total ?? 0).toLocaleString()}</strong>문제</span>
+            <span>📅 <strong className="text-gray-900">{stats.cycles ?? 0}</strong>회차</span>
+            <span>📚 <strong className="text-gray-900">{stats.subjects ?? 0}</strong>과목</span>
           </div>
+        )}
+        {stats && stats.error && (
+          <div className="mt-3 text-xs text-red-400">통계 로드 실패: {stats.error}</div>
         )}
       </header>
 
