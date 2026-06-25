@@ -17,70 +17,97 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
   const [selectedCycle, setSelectedCycle] = useState('all')
   const [selectedSubject, setSelectedSubject] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [chatProblem, setChatProblem] = useState<Problem | null>(null)
+  const [cycles, setCycles] = useState<string[]>([])
+  const [subjects, setSubjects] = useState<string[]>([])
 
   const PAGE_SIZE = 20
 
+  // 통계 로드 (회차/과목 목록)
   useEffect(() => {
-    fetch('/data/problems.json')
-      .then(r => { if (!r.ok) throw new Error('Failed to load'); return r.json() })
-      .then((data: Problem[]) => { setProblems(data); setLoading(false) })
-      .catch(err => { setError(err.message); setLoading(false) })
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => {
+        if (data.subjectsList) setSubjects(data.subjectsList)
+      })
+      .catch(() => {})
   }, [])
 
-  const cycles = useMemo(() => {
-    const set = new Set(problems.map(p => p.회차).filter(Boolean))
-    return Array.from(set).sort((a, b) => (b || '').localeCompare(a || ''))
-  }, [problems])
+  // 문제 로드 (필터 변경 시마다)
+  useEffect(() => {
+    const fetchProblems = async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        params.set('limit', String(PAGE_SIZE))
+        params.set('offset', String((currentPage - 1) * PAGE_SIZE))
+        if (selectedCycle !== 'all') params.set('cycle', selectedCycle)
+        if (selectedSubject !== 'all') params.set('subject', selectedSubject)
+        if (searchQuery.trim()) params.set('q', searchQuery.trim())
 
-  const subjects = useMemo(() => {
-    const set = new Set(problems.map(p => p.과목).filter(Boolean))
-    return Array.from(set)
-  }, [problems])
+        // 중복 출제 필터
+        if (config.type === 'dup-high') params.set('dupCount', '3')
+        else if (config.type === 'dup-two') params.set('dupCount', '2')
 
-  const filtered = useMemo(() => {
-    let list = problems
+        const res = await fetch(`/api/problems?${params.toString()}`)
+        const data = await res.json()
 
-    // 타입별 기본 필터
-    if (config.type === 'dup-high') {
-      list = list.filter(p => {
-        if (!p.중복출제) return false
-        return p.중복출제.split(',').length >= 2  // 3회 이상 출제
-      })
-    } else if (config.type === 'dup-two') {
-   list = list.filter(p => {
-     if (!p.중복출제) return false
-     return p.중복출제.split(',').length === 1  // 정확히 2회 출제
-   })
- }
+        if (!res.ok) throw new Error(data.error || '문제 로드 실패')
 
-    // 사용자 필터
-    if (selectedCycle !== 'all') list = list.filter(p => p.회차 === selectedCycle)
-    if (selectedSubject !== 'all') list = list.filter(p => p.과목 === selectedSubject)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      list = list.filter(p => `${p.문제 || ''} ${p.정답 || ''} ${p.해설 || ''} ${p.보기 || ''}`.toLowerCase().includes(q))
+        // DB row → Problem 타입 변환
+        const rows = (data.rows || []).map((r: any) => ({
+          id: r.id,
+          문제: r['문제'] || '',
+          정답: r['정답'] || '',
+          해설: r['해설'] || '',
+          사용공식: r['사용공식'] || '',
+          출처: r['출처'] || '',
+          회차: r['회차'] || '',
+          과목: r['과목'] || '',
+          난이도: r['난이도'] || '',
+          보기: r['보기'] || '',
+          중복출제: r['중복출제'] || '',
+        }))
+        setProblems(rows)
+        setTotal(data.total || 0)
+
+        // 회차 목록 (첫 페이지 + 첫 로딩 시만 갱신)
+        if (currentPage === 1 && cycles.length === 0) {
+          const allParams = new URLSearchParams()
+          allParams.set('limit', '9999')
+          const allRes = await fetch(`/api/problems?${allParams.toString()}`)
+          const allData = await allRes.json()
+          const uniqueCycles = Array.from(new Set((allData.rows || [])
+            .map((r: any) => r['회차']).filter(Boolean))) as string[]
+          setCycles(uniqueCycles.sort((a, b) => b.localeCompare(a)))
+        }
+
+        setError(null)
+      } catch (err: any) {
+        setError(err.message || '문제를 불러올 수 없습니다')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    return list
-  }, [problems, config.type, selectedCycle, selectedSubject, searchQuery])
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    fetchProblems()
+  }, [config.type, selectedCycle, selectedSubject, searchQuery, currentPage])
 
   // 필터 변경 시 페이지 리셋
   useEffect(() => { setCurrentPage(1) }, [selectedCycle, selectedSubject, searchQuery])
 
-  // AI 해설 요청 시 챗봇에 문제 전달
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+
   const handleExplain = (problem: Problem) => {
     setChatProblem(problem)
   }
 
-  if (loading) {
+  if (loading && problems.length === 0) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -91,7 +118,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     )
   }
 
-  if (error) {
+  if (error && problems.length === 0) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -104,9 +131,8 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* 상단 네비게이션 */}
       <header className="shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-full mx-auto flex items-center gap-4">
+        <div className="max-w-full mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/" className="text-gray-400 hover:text-gray-700 text-xl shrink-0" title="메인으로">
             ⚡
           </Link>
@@ -115,7 +141,6 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
             <p className="text-xs text-gray-500">{config.subtitle}</p>
           </div>
 
-          {/* 필터 */}
           <div className="flex-1 flex items-center gap-3 overflow-x-auto">
             {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-two') && (
               <select value={selectedCycle} onChange={e => setSelectedCycle(e.target.value)}
@@ -139,22 +164,20 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           </div>
 
           <div className="text-sm text-gray-500 shrink-0">
-            <strong className="text-gray-900">{filtered.length}</strong>개
+            <strong className="text-gray-900">{total.toLocaleString()}</strong>개
           </div>
         </div>
       </header>
 
-      {/* 메인 영역: 문제 목록 + 챗봇 */}
       <div className="flex-1 flex min-h-0">
-        {/* 문제 목록 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {paged.length === 0 ? (
+          {problems.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <div className="text-4xl mb-3">📭</div>
               <p>조건에 맞는 문제가 없습니다</p>
             </div>
           ) : (
-            paged.map((problem, idx) => (
+            problems.map((problem, idx) => (
               <ProblemCard
                 key={problem.id || idx}
                 problem={problem}
@@ -164,7 +187,6 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
             ))
           )}
 
-          {/* 페이지네이션 */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 py-6">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -184,13 +206,11 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
-        {/* AI 챗봇 패널 (고정, 스크롤 분리) */}
         <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white">
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
         </div>
       </div>
 
-      {/* 모바일 챗봇 (오버레이) */}
       <div className="md:hidden">
         <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
       </div>
