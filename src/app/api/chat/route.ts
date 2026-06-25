@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const OMNI_BASE_URL = process.env.OMNI_BASE_URL || 'https://omni.nhd.us.to/v1'
 const OMNI_API_KEY = process.env.OMNI_API_KEY || ''
-const OMNI_MODEL = process.env.OMNI_MODEL || 'combo1'
+const OMNI_MODEL = process.env.OMNI_MODEL || 'newapi1'
 
 export const dynamic = 'force-dynamic'
 
