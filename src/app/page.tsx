@@ -5,16 +5,16 @@ import Link from 'next/link'
 
 interface Stats {
   total: number
-  with_answer: number
   cycles: number
   subjects: number
+  subjectsList?: string[]
 }
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null)
 
   useEffect(() => {
-    fetch('/data/stats.json')
+    fetch('/api/stats')
       .then(r => r.json())
       .then(setStats)
       .catch(() => {})
@@ -22,7 +22,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* 헤더 */}
       <header className="pt-12 pb-8 px-4 text-center">
         <div className="text-5xl mb-4">⚡</div>
         <h1 className="text-4xl font-bold text-gray-900 mb-3">전기기사 기출문제</h1>
@@ -38,7 +37,6 @@ export default function Home() {
         )}
       </header>
 
-      {/* 메뉴 카드 */}
       <section className="max-w-4xl mx-auto px-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Link href="/cycle" className="menu-card group">
@@ -74,10 +72,9 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* 하단 안내 */}
         <div className="mt-12 text-center text-sm text-gray-400">
           <p>각 문제 페이지에서 🤖 AI 튜터에게 질문할 수 있습니다</p>
-          <p className="mt-1">웹 검색 기능으로 최신 정보도 확인하세요</p>
+          <p className="mt-1">기출 DB 검색 + 웹 검색 모두 지원합니다</p>
         </div>
       </section>
     </main>

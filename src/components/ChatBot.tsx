@@ -6,6 +6,7 @@ import type { Problem } from '../types/Problem'
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
+  sources?: string[]
 }
 
 interface Props {
@@ -18,8 +19,10 @@ export default function ChatBot({ currentProblem, subject }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
+  const [dbSearchEnabled, setDbSearchEnabled] = useState(true)
   const [webSearchQuery, setWebSearchQuery] = useState('')
   const [webSearchResults, setWebSearchResults] = useState('')
+  const [dbSearchResults, setDbSearchResults] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -30,13 +33,8 @@ export default function ChatBot({ currentProblem, subject }: Props) {
 
   useEffect(() => { scrollToBottom() }, [messages])
 
-  // 현재 문제 컨텍스트 생성
   const buildSystemPrompt = useCallback(() => {
-    let prompt = `당신은 전기기사 시험 전문 튜터입니다. 
-학생이 전기기사 기출문제를 풀면서 질문하는 것에 대해 도움을 줍니다.
-답변은 한국어로 작성하며, 쉬운 예시와 비유를 사용합니다.
-수식이나 공식이 필요하면 포함시켜 주세요.
-답변은 간결하지만 충분한 설명을 포함해야 합니다.`
+    let prompt = `당신은 전기기사 시험 전문 튜터입니다.\n학생이 전기기사 기출문제를 풀면서 질문하는 것에 대해 도움을 줍니다.\n답변은 한국어로 작성하며, 쉬운 예시와 비유를 사용합니다.\n수식이나 공식이 필요하면 포함시켜 주세요.\n답변은 간결하지만 충분한 설명을 포함해야 합니다.`
 
     if (subject) {
       prompt += `\n\n현재 과목: ${subject}`
@@ -51,16 +49,20 @@ export default function ChatBot({ currentProblem, subject }: Props) {
       if (currentProblem.정답) prompt += `- 정답: ${currentProblem.정답}\n`
       if (currentProblem.해설) prompt += `- 기존 해설: ${currentProblem.해설}\n`
       if (currentProblem.사용공식) prompt += `- 사용 공식: ${currentProblem.사용공식}\n`
+      prompt += `\n학생이 "이 문제 설명해줘", "왜 이게 답이야?" 등 이 문제에 대한 질문을 할 수 있습니다.\n필요시 학생에게 더 효과적인 학습법을 제안하세요.`
     }
 
     if (webSearchEnabled && webSearchResults) {
       prompt += `\n\n[웹 검색 결과]\n${webSearchResults}`
     }
 
-    return prompt
-  }, [currentProblem, subject, webSearchEnabled, webSearchResults])
+    if (dbSearchResults) {
+      prompt += `\n\n[기출문제 DB 검색 결과 - 출처를 명시하며 인용하세요]\n${dbSearchResults}`
+    }
 
-  // 웹 검색 실행
+    return prompt
+  }, [currentProblem, subject, webSearchEnabled, webSearchResults, dbSearchResults])
+
   const doWebSearch = async (query: string) => {
     try {
       const res = await fetch('/api/search', {
@@ -77,15 +79,51 @@ export default function ChatBot({ currentProblem, subject }: Props) {
     }
   }
 
-  // 메시지 전송
-  const sendMessage = async (searchFirst = false) => {
+  const doDbSearch = async (query: string) => {
+    try {
+      const res = await fetch(`/api/problems?q=${encodeURIComponent(query)}&limit=5`)
+      const data = await res.json()
+      if (data.rows && data.rows.length > 0) {
+        const formatted = data.rows.map((p: any, i: number) => {
+          const q = (p.문제 || '').slice(0, 200)
+          const ans = p.정답 || '(미등록)'
+          const cycle = p.회차 || '미상'
+          const subj = p.과목 || '미상'
+          return `[${i+1}] ${cycle} ${subj}\n문제: ${q}...\n정답: ${ans}\nID: ${p.id}`
+        }).join('\n\n')
+        setDbSearchResults(formatted)
+        return formatted
+      } else {
+        setDbSearchResults('검색 결과 없음')
+        return ''
+      }
+    } catch {
+      setDbSearchResults('DB 검색 실패')
+      return ''
+    }
+  }
+
+  // 의도 감지: 관련/유사/다른 회차/같은 유형 등의 키워드
+  const shouldSearchDb = (text: string): boolean => {
+    if (!dbSearchEnabled) return false
+    const keywords = ['관련', '유사', '비슷', '같은 유형', '다른 회차', '예시', '샘플', '추천', '더 풀어', '복습', '예전']
+    return keywords.some(k => text.includes(k))
+  }
+
+  const sendMessage = async () => {
     const text = input.trim()
     if (!text || loading) return
 
-    let searchResults = ''
-    if (searchFirst || webSearchEnabled) {
-      searchResults = await doWebSearch(text)
-      setWebSearchResults(searchResults)
+    let webResults = ''
+    let dbResults = ''
+
+    if (webSearchEnabled) {
+      webResults = await doWebSearch(text)
+      setWebSearchResults(webResults)
+    }
+
+    if (shouldSearchDb(text)) {
+      dbResults = await doDbSearch(text)
     }
 
     const userMsg: Message = { role: 'user', content: text }
@@ -104,7 +142,11 @@ export default function ChatBot({ currentProblem, subject }: Props) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          problemContext: currentProblem ? `${currentProblem.회차} ${currentProblem.과목} - ${currentProblem.문제}` : undefined,
+          ragContext: dbResults || undefined,
+        }),
       })
 
       const data = await res.json()
@@ -132,7 +174,6 @@ export default function ChatBot({ currentProblem, subject }: Props) {
 
   return (
     <>
-      {/* 모바일 토글 버튼 */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="md:hidden fixed bottom-4 right-4 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition"
@@ -141,14 +182,12 @@ export default function ChatBot({ currentProblem, subject }: Props) {
         {isOpen ? '✕' : '🤖'}
       </button>
 
-      {/* 챗봇 패널 */}
       <div className={`
         chat-panel bg-white border-l border-gray-200
         fixed md:static inset-0 md:inset-auto z-40 md:z-auto
         ${isOpen ? 'flex' : 'hidden'} md:flex
         flex-col w-full md:w-96 lg:w-[420px]
       `}>
-        {/* 헤더 */}
         <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
@@ -160,7 +199,6 @@ export default function ChatBot({ currentProblem, subject }: Props) {
           <button onClick={() => setIsOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
 
-        {/* 현재 문제 표시 */}
         {currentProblem && (
           <div className="border-b border-gray-100 px-4 py-2 bg-yellow-50 text-xs text-yellow-800">
             📌 현재 문제: {currentProblem.회차} | {currentProblem.과목}
@@ -170,7 +208,6 @@ export default function ChatBot({ currentProblem, subject }: Props) {
           </div>
         )}
 
-        {/* 메시지 영역 */}
         <div className="chat-messages flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-center text-gray-400 text-sm py-8">
@@ -178,15 +215,19 @@ export default function ChatBot({ currentProblem, subject }: Props) {
               <p>전기기사 문제에 대해</p>
               <p>궁금한 점을 질문해보세요</p>
               <div className="mt-4 space-y-2 text-xs">
-                <button onClick={() => { setInput('이 문제의 핵심 개념을 설명해주세요'); }}
+                <button onClick={() => setInput('이 문제의 핵심 개념을 설명해주세요')}
                   className="block w-full text-left px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                   💡 핵심 개념 설명 요청
                 </button>
-                <button onClick={() => { setInput('이 문제와 비슷한 예제를 만들어주세요'); }}
+                <button onClick={() => setInput('비슷한 유형의 예전 기출문제를 찾아줘')}
+                  className="block w-full text-left px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                  🔍 관련 기출문제 검색
+                </button>
+                <button onClick={() => setInput('이 문제와 유사한 예제를 만들어줘')}
                   className="block w-full text-left px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                   📝 유사 문제 생성 요청
                 </button>
-                <button onClick={() => { setInput('이 문제에 사용된 공식을 정리해주세요'); }}
+                <button onClick={() => setInput('이 문제에 사용된 공식을 정리해주세요')}
                   className="block w-full text-left px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                   📐 공식 정리 요청
                 </button>
@@ -220,10 +261,19 @@ export default function ChatBot({ currentProblem, subject }: Props) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* 입력 영역 */}
         <div className="border-t border-gray-200 p-3 bg-white">
-          {/* 웹 검색 토글 */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <button
+              onClick={() => setDbSearchEnabled(!dbSearchEnabled)}
+              className={`text-xs px-2 py-1 rounded-full border transition ${
+                dbSearchEnabled
+                  ? 'bg-blue-100 border-blue-300 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+              }`}
+              title="관련/유사 문제 요청 시 기출 DB 자동 검색"
+            >
+              🗄️ 기출 DB {dbSearchEnabled ? 'ON' : 'OFF'}
+            </button>
             <button
               onClick={() => setWebSearchEnabled(!webSearchEnabled)}
               className={`text-xs px-2 py-1 rounded-full border transition ${
@@ -234,8 +284,11 @@ export default function ChatBot({ currentProblem, subject }: Props) {
             >
               🔍 웹 검색 {webSearchEnabled ? 'ON' : 'OFF'}
             </button>
+            {dbSearchResults && (
+              <span className="text-xs text-blue-500">🗄️DB</span>
+            )}
             {webSearchQuery && (
-              <span className="text-xs text-gray-400 truncate">검색: {webSearchQuery}</span>
+              <span className="text-xs text-gray-400 truncate">🔍{webSearchQuery}</span>
             )}
           </div>
 
@@ -251,7 +304,7 @@ export default function ChatBot({ currentProblem, subject }: Props) {
               style={{ minHeight: '42px', maxHeight: '120px' }}
             />
             <button
-              onClick={() => sendMessage(webSearchEnabled)}
+              onClick={sendMessage}
               disabled={loading || !input.trim()}
               className="shrink-0 bg-blue-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
