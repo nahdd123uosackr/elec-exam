@@ -64,8 +64,26 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
   const isAnswered = pick !== undefined
   const isCorrect = isAnswered && correctAnswers.includes(pick)
 
-  const rawChoices = (problem.보기 || '').split(/\s*(?=[①②③④⑤]|\d+[\.\)])\s*/).map(s => s.trim()).filter(Boolean)
-  const choices = rawChoices.length >= 2 ? rawChoices : (problem.보기 || '').split(/\n+/).map(s => s.trim()).filter(Boolean)
+  // 보기 분리: 마커(①②③④⑤ / 1. / 1) / (1)) 앞에서 split, 마커 반복 허용
+  const rawChoices = (problem.보기 || '')
+    .split(/\n+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    // 각 라인에서 마커(중복 가능) 제거하여 텍스트만 추출
+    .map(line => {
+      // 마커만 연속된 경우 (예: '① ① 강압 변압기') - 첫 마커 제거
+      // 이후 '①' 또는 '1.' 또는 '(1)' 패턴 제거
+      const cleaned = line
+        .replace(/^([①-⑤])\s+\1\s+/, '$1 ')  // 중복 마커
+        .replace(/^[①-⑤]\s+/, '')
+        .replace(/^\d+\.\s+[①-⑤]\s+/, '')
+        .replace(/^\d+\.\s+/, '')
+        .replace(/^\(\d+\)\s+/, '')
+        .replace(/^\d+\)\s+/, '')
+      return cleaned.trim()
+    })
+    .filter(Boolean)
+  const choices = rawChoices.length >= 1 ? rawChoices : [] // 빈 경우 빈 배열
 
   // 중복출제 횟수 계산
   const dupCount = problem.중복출제 ? problem.중복출제.split(',').length + 1 : 1
