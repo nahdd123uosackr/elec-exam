@@ -32,12 +32,13 @@ function renderWithImages(text: string): React.ReactNode {
 
 function parseChoice(raw: string, idx: number) {
   const circled = ['①', '②', '③', '④', '⑤']
-  const trimmed = raw.trim()
-  const m = trimmed.match(/^[①-⑤]\s*(.*)$/) || trimmed.match(/^[\(]?(\d)[\)\.]?\s*(.*)$/)
-  if (m) {
-    const text = (m[2] ?? m[1] ?? '').trim()
-    return { num: idx + 1, text: text || trimmed, label: circled[idx] || `(${idx + 1})` }
-  }
+  let trimmed = raw.trim()
+  // 마커(①-⑤)로 시작하면 제거 (이 parseChoice는 마커 없는 텍스트를 받음)
+  trimmed = trimmed.replace(/^[①-⑤]\s+/, '')
+  // '1.' '1)' '(1)' 마커도 제거 (안전장치)
+  trimmed = trimmed.replace(/^\d+\.\s+/, '')
+  trimmed = trimmed.replace(/^\d+\)\s+/, '')
+  trimmed = trimmed.replace(/^\(\d+\)\s+/, '')
   return { num: idx + 1, text: trimmed, label: circled[idx] || `(${idx + 1})` }
 }
 
