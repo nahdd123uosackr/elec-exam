@@ -73,18 +73,19 @@ def extract_korean_sequences(text: str, min_len: int = 5) -> list[str]:
 
 
 def find_image_for_problem(html: str, problem_text: str, expected_count: int = 1) -> list[str]:
-    """문제 본문 영역 안의 이미지 src를 추출.
+    """문제 본문 + 보기 영역의 이미지 src를 추출.
 
     kinz.kr 페이지 구조:
     <div class="col-lg exam-question" id="<qid>">
       <h5>N. 문제 본문</h5>
-      <img src="/data/exam/...">
-      <ul><li value="1">① ...</li>...
+      <img src="/data/exam/...">  (본문 이미지)
+      <ul><li value="1">① ...</li>
+        또는 <li value="3">③ <img src="/data/exam/..."></li>  (보기 이미지)
+      </ul>
     </div>
     """
-    # 한글 시퀀스 추출 (공백/특수문자 무시)
+    # 한글 anchor (긴 단어부터)
     anchors = extract_korean_sequences(problem_text, min_len=4)
-    # 영문 fallback: 영문 알파벳 연속 5자 이상
     if not anchors:
         cur = []
         for ch in problem_text:
@@ -121,11 +122,7 @@ def find_image_for_problem(html: str, problem_text: str, expected_count: int = 1
         next_div = pos + 10000
     region = html[div_start:next_div]
 
-    # 보기 이미지 제외: <ul> 위치 찾고 그 전까지만
-    ul_pos = region.find('<ul>')
-    if ul_pos > 0:
-        region = region[:ul_pos]
-
+    # 전체 영역에서 <img src> 추출 (보기 영역 포함)
     imgs = re.findall(r'src="(/data/exam/[^"]+\.(?:gif|jpg|jpeg|png|webp))"', region)
 
     seen = []
@@ -166,17 +163,18 @@ def main():
     conn.autocommit = False
     cur = conn.cursor()
 
-    # 이미지 placeholder가 있는 kinz.kr row 조회
-    print("=== DB 스캔 ===")
+    # DB 스캔: 보기에 [이미지] placeholder가 있는 row (본문 이미지는 이미 처리됨)
+    print("=== DB 스캔 (보기 이미지 placeholder) ===")
     cur.execute("""
         SELECT id, "문제", "출처"
         FROM problems
         WHERE "출처" LIKE '%kinz.kr%'
-          AND "문제" LIKE '%[이미지:%'
+          AND "문제" LIKE '%[이미지]%'
+          AND "문제" NOT LIKE '%[이미지: %개]%'
         ORDER BY id
     """)
     rows = cur.fetchall()
-    print(f"  kinz.kr 이미지 placeholder row: {len(rows)}")
+    print(f"  보기 이미지 placeholder row: {len(rows)}")
 
     if not rows:
         cur.close()
@@ -207,12 +205,18 @@ def main():
         processed_pages += 1
 
         for pid, problem, src in entries:
-            # placeholder에서 이미지 개수 추출
-            m = re.search(r'\[이미지:\s*(\d+)개?\]', problem)
-            expected = int(m.group(1)) if m else 1
+            # placeholder 개수 추출 (본문 + 보기)
+            main_m = re.search(r'\[이미지:\s*(\d+)개?\]', problem)
+            main_count = int(main_m.group(1)) if main_m else 0
+            # 보기에서 [이미지] 카운트
+            choice_count = problem.count('[이미지]') - problem.count('[이미지:')
+            # 위 계산이 음수가 될 수 있음 (placeholder 안에 [이미지]가 포함된 경우)
+            if choice_count < 0:
+                choice_count = 0
+            total_expected = main_count + choice_count
 
             # 이미지 찾기
-            img_paths = find_image_for_problem(html, problem, expected)
+            img_paths = find_image_for_problem(html, problem, total_expected)
             if not img_paths:
                 # 못 찾은 경우 - 다음으로
                 continue
@@ -227,13 +231,28 @@ def main():
             if not local_urls:
                 continue
 
-            # 문제 텍스트에서 placeholder를 실제 URL로 교체
-            placeholder = f"[이미지: {expected}개]" if expected > 1 else "[이미지: 1개]"
-            if placeholder in problem:
-                replacement = "".join(f"[이미지: {url}]" for url in local_urls)
-                new_problem = problem.replace(placeholder, replacement)
+            # 문제 텍스트 + 보기 placeholder를 실제 URL로 교체
+            new_problem = problem
+            url_iter = iter(local_urls)
+
+            # 1) 본문 placeholder [이미지: N개] 먼저 교체
+            if main_count > 0:
+                placeholder = f"[이미지: {main_count}개]" if main_count > 1 else "[이미지: 1개]"
+                if placeholder in new_problem:
+                    replacement = "".join(f"[이미지: {next(url_iter)}]" for _ in range(main_count))
+                    new_problem = new_problem.replace(placeholder, replacement, 1)
+
+            # 2) 보기 placeholder [이미지] 교체 (앞에서부터 순서대로)
+            while '[이미지]' in new_problem:
+                try:
+                    url = next(url_iter)
+                except StopIteration:
+                    break
+                new_problem = new_problem.replace('[이미지]', f'[이미지: {url}]', 1)
+
+            if new_problem != problem:
                 updates.append((new_problem, pid))
-                print(f"  ✓ {pid}: {len(local_urls)}개 이미지 복원")
+                print(f"  ✓ {pid}: 본문 {main_count} + 보기 {choice_count} = {main_count + choice_count}개 처리")
 
         # 페이지 10개마다 진행 상황
         if processed_pages % 5 == 0:
