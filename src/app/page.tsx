@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 interface Stats {
-  total: number
-  cycles: number
-  subjects: number
+  total?: number
+  cycles?: number
+  subjects?: number
   subjectsList?: string[]
+  error?: string
 }
 
 export default function Home() {
