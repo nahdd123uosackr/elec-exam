@@ -2,31 +2,52 @@
 
 import React, { useState } from 'react'
 import type { Problem } from '../types/Problem'
+import { InlineMath, BlockMath } from 'react-katex'
 
-/** 이미지 렌더링 */
+/** 이미지/수식 렌더링 */
 function renderWithImages(text: string): React.ReactNode {
-  const parts = text.split(/(🖼️|\[이미지:\s*[^\]]+\])/g)
-  return parts.map((part, i) => {
-    if (part === '🖼️') {
-      return (
-        <span key={i} className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 align-middle" title="원본 이미지 없음">
-          🖼️ 이미지
-        </span>
-      )
-    }
-    const m = part.match(/\[이미지:\s*([^\]]+)\]/)
+  // 1. KaTeX 블록 ($$...$$) 먼저 처리
+  const blocks = text.split(/(\$\$[^$]+\$\$)/g)
+  return blocks.map((block, bi) => {
+    const m = block.match(/^\$\$([^$]+)\$\$$/)
     if (m) {
-      const src = m[1].trim()
-      if (src.includes('\\') || src.includes('frac') || src.includes('left')) {
+      try {
+        return <InlineMath key={bi} math={m[1]} />
+      } catch {
+        return <code key={bi} className="inline-block bg-red-50 text-red-700 px-1 py-0.5 rounded">{m[1]}</code>
+      }
+    }
+    // 2. 이미지 마커 분할
+    return block.split(/(🖼️|<img[^>]*>|\[이미지[^\]]*\])/g).map((part, pi) => {
+      if (part === '🖼️') {
+        // 이미지가 없는 문제는 빈 공간으로 (아무것도 렌더링 안 함)
+        return <span key={`${bi}-${pi}`} className="inline-block w-0" />
+      }
+      const imgMatch = part.match(/<img\s+src="([^"]+)"[^>]*>/)
+      if (imgMatch) {
         return (
-          <code key={i} className="inline-block bg-blue-50 text-blue-700 text-xs px-1 py-0.5 rounded align-middle font-mono" title={src}>
-            {src.length > 40 ? src.slice(0, 40) + '…' : src}
-          </code>
+          <img key={`${bi}-${pi}`} src={imgMatch[1]} alt="문제 이미지"
+            className="inline-block max-h-24 align-middle mx-1 rounded border border-gray-200"
+            loading="lazy" />
         )
       }
-      return <img key={i} src={src} alt="수식 이미지" className="inline-block max-h-16 align-middle mx-1" loading="lazy" />
-    }
-    return <span key={i}>{part}</span>
+      const latexMatch = part.match(/\[이미지:\s*([^\]]+)\]/)
+      if (latexMatch) {
+        const latex = latexMatch[1].trim()
+        if (latex.includes('\\')) {
+          try {
+            return <InlineMath key={`${bi}-${pi}`} math={latex} />
+          } catch {
+            return <code key={`${bi}-${pi}`} className="inline-block bg-blue-50 text-blue-700 text-xs px-1 py-0.5 rounded">{latex}</code>
+          }
+        }
+        // URL이면 img 태그로
+        return <img key={`${bi}-${pi}`} src={latex} alt="문제 이미지"
+          className="inline-block max-h-24 align-middle mx-1 rounded border border-gray-200"
+          loading="lazy" />
+      }
+      return <span key={`${bi}-${pi}`}>{part}</span>
+    })
   })
 }
 

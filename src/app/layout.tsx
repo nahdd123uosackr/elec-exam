@@ -5,6 +5,8 @@ export const metadata = {
   description: '전기기사 시험 대비 기출문제 학습 사이트 - AI 해설 도움',
 }
 
+import 'katex/dist/katex.min.css'
+
 export default function RootLayout({
   children,
 }: {
@@ -12,6 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      </head>
       <body className="bg-gray-50 min-h-screen">{children}</body>
     </html>
   )
