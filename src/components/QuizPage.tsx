@@ -206,14 +206,18 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
+        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 */}
         <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white">
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
         </div>
       </div>
 
-      <div className="md:hidden">
-        <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
-      </div>
+      {/* 모바일: AI 튜터는 ChatBot 내부의 플로팅 버튼으로만 접근 — md 이하에서만 렌더링 */}
+      {chatProblem && (
+        <div className="md:hidden">
+          <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
+        </div>
+      )}
     </div>
   )
 }
