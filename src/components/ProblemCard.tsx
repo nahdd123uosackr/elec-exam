@@ -155,7 +155,9 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
               <button key={ci} type="button" disabled={isAnswered}
                 onClick={() => setPick(choice.num)} className={btnClass}>
                 <span className="font-bold shrink-0 mt-0.5">{choice.label}</span>
-                <span className="flex-1">{renderWithImages(choice.text)}</span>
+                {choice.text && choice.text !== choice.label ? (
+                  <span className="flex-1">{renderWithImages(choice.text)}</span>
+                ) : null}
                 {isAnswered && isCorrectChoice && <span className="shrink-0 text-xs font-bold text-green-700">정답</span>}
                 {isAnswered && isPicked && !isCorrectChoice && <span className="shrink-0 text-xs font-bold text-red-700">내 선택</span>}
               </button>
