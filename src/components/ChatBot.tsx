@@ -26,6 +26,12 @@ export default function ChatBot({ currentProblem, subject }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // currentProblem 변경 시 패널 닫기 (다른 문제 선택 시)
+  useEffect(() => {
+    setIsOpen(false)
+  }, [currentProblem])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -34,7 +40,11 @@ export default function ChatBot({ currentProblem, subject }: Props) {
   useEffect(() => { scrollToBottom() }, [messages])
 
   const buildSystemPrompt = useCallback(() => {
-    let prompt = `당신은 전기기사 시험 전문 튜터입니다.\n학생이 전기기사 기출문제를 풀면서 질문하는 것에 대해 도움을 줍니다.\n답변은 한국어로 작성하며, 쉬운 예시와 비유를 사용합니다.\n수식이나 공식이 필요하면 포함시켜 주세요.\n답변은 간결하지만 충분한 설명을 포함해야 합니다.`
+    let prompt = `당신은 전기기사 시험 전문 튜터입니다.
+학생이 전기기사 기출문제를 풀면서 질문하는 것에 대해 도움을 줍니다.
+답변은 한국어로 작성하며, 쉬운 예시와 비유를 사용합니다.
+수식이나 공식이 필요하면 포함시켜 주세요.
+답변은 간결하지만 충분한 설명을 포함해야 합니다.`
 
     if (subject) {
       prompt += `\n\n현재 과목: ${subject}`
@@ -49,7 +59,8 @@ export default function ChatBot({ currentProblem, subject }: Props) {
       if (currentProblem.정답) prompt += `- 정답: ${currentProblem.정답}\n`
       if (currentProblem.해설) prompt += `- 기존 해설: ${currentProblem.해설}\n`
       if (currentProblem.사용공식) prompt += `- 사용 공식: ${currentProblem.사용공식}\n`
-      prompt += `\n학생이 "이 문제 설명해줘", "왜 이게 답이야?" 등 이 문제에 대한 질문을 할 수 있습니다.\n필요시 학생에게 더 효과적인 학습법을 제안하세요.`
+      prompt += `\n학생이 "이 문제 설명해줘", "왜 이게 답이야?" 등 이 문제에 대한 질문을 할 수 있습니다.
+필요시 학생에게 더 효과적인 학습법을 제안하세요.`
     }
 
     if (webSearchEnabled && webSearchResults) {
@@ -174,29 +185,43 @@ export default function ChatBot({ currentProblem, subject }: Props) {
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed bottom-4 right-4 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition"
-        title="AI 튜터"
-      >
-        {isOpen ? '✕' : '🤖'}
-      </button>
+      {/* 모바일 플로팅 버튼: currentProblem 있을 때만 표시 */}
+      {currentProblem && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="md:hidden fixed bottom-4 right-4 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition"
+          title="AI 튜터"
+        >
+          {isOpen ? '✕' : '🤖'}
+        </button>
+      )}
 
-      <div className={`
-        chat-panel bg-white border-l border-gray-200
-        fixed md:static inset-0 md:inset-auto z-40 md:z-auto
-        ${isOpen ? 'flex' : 'hidden'} md:flex
-        flex-col w-full md:w-96 lg:w-[420px]
-      `}>
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🤖</span>
-            <div>
-              <h3 className="font-semibold text-gray-900 text-sm">AI 전기기사 튜터</h3>
-              <p className="text-xs text-gray-500">문제에 대해 질문하세요</p>
-            </div>
-          </div>
-          <button onClick={() => setIsOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      {/* 모바일: 패널 열렸을 때 배경 딤드 */}
+      {isOpen && currentProblem && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/30"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* 채팅 패널 */}
+      <div
+        ref={panelRef}
+        className={`
+          chat-panel bg-white border-l border-gray-200
+          fixed md:static left-0 bottom-0 z-40 md:z-auto
+          ${isOpen && currentProblem ? 'flex' : 'hidden'} md:flex
+          flex-col w-full md:w-96 lg:w-[420px] h-[70vh] md:h-full
+          transform-gpu
+          ${isOpen && currentProblem ? 'translate-y-0' : 'translate-y-full'}
+          transition-transform duration-300 ease-out
+        `}
+      >
+        <div className="flex justify-between items-center px-4 py-2 border-b bg-gray-50">
+          <h3 className="font-semibold text-gray-900 text-sm">AI 전기기사 튜터</h3>
+          <button onClick={() => setIsOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 text-xl">
+            ✕
+          </button>
         </div>
 
         {currentProblem && (
