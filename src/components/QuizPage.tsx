@@ -212,12 +212,10 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
         </div>
       </div>
 
-      {/* 모바일: AI 튜터는 ChatBot 내부의 플로팅 버튼으로만 접근 — md 이하에서만 렌더링 */}
-      {chatProblem && (
-        <div className="md:hidden">
-          <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
-        </div>
-      )}
+      {/* 모바일: ChatBot 플로팅 버튼은 항상 표시 (내부 isOpen + currentProblem 게이팅) */}
+      <div className="md:hidden">
+        <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
+      </div>
     </div>
   )
 }

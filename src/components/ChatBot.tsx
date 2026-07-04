@@ -185,19 +185,17 @@ export default function ChatBot({ currentProblem, subject }: Props) {
 
   return (
     <>
-      {/* 모바일 플로팅 버튼: currentProblem 있을 때만 표시 */}
-      {currentProblem && (
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden fixed bottom-4 right-4 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition"
-          title="AI 튜터"
-        >
-          {isOpen ? '✕' : '🤖'}
-        </button>
-      )}
+      {/* 모바일 플로팅 버튼: 항상 표시 (튜터 인지용) */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="md:hidden fixed bottom-4 right-4 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 transition"
+        title="AI 튜터"
+      >
+        {isOpen ? '✕' : '🤖'}
+      </button>
 
       {/* 모바일: 패널 열렸을 때 배경 딤드 */}
-      {isOpen && currentProblem && (
+      {isOpen && (
         <div
           className="md:hidden fixed inset-0 z-30 bg-black/30"
           onClick={() => setIsOpen(false)}
@@ -210,10 +208,10 @@ export default function ChatBot({ currentProblem, subject }: Props) {
         className={`
           chat-panel bg-white border-l border-gray-200
           fixed md:static left-0 bottom-0 z-40 md:z-auto
-          ${isOpen && currentProblem ? 'flex' : 'hidden'} md:flex
+          ${isOpen ? 'flex' : 'hidden'} md:flex
           flex-col w-full md:w-96 lg:w-[420px] h-[70vh] md:h-full
           transform-gpu
-          ${isOpen && currentProblem ? 'translate-y-0' : 'translate-y-full'}
+          ${isOpen ? 'translate-y-0' : 'translate-y-full'}
           transition-transform duration-300 ease-out
         `}
       >
