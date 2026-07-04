@@ -1,7 +1,57 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { InlineMath, BlockMath } from 'react-katex'
 import type { Problem } from '../types/Problem'
+
+// 수식(LaTeX/KaTeX)을 포함한 텍스트를 파싱해 react-katex로 렌더링
+function MathMessage({ content }: { content: string }) {
+  // $$...$$ (블록) → BlockMath
+  // $...$ (인라인) → InlineMath
+  // 그 외 텍스트 → 일반 텍스트
+  const parts: React.ReactNode[] = []
+  let remaining = content
+  let lastIndex = 0
+
+  // 먼저 블록 수식($$...$$) 처리
+  const blockRegex = /\$\$([\s\S]*?)\$\$/g
+  let blockMatch: RegExpExecArray | null
+  while ((blockMatch = blockRegex.exec(remaining)) !== null) {
+    if (blockMatch.index > lastIndex) {
+      parts.push(<span key={`text-${lastIndex}`}>{remaining.slice(lastIndex, blockMatch.index)}</span>)
+    }
+    parts.push(
+      <div key={`block-${blockMatch.index}`} className="my-2">
+        <BlockMath math={blockMatch[1]} renderError={e => <span className="text-red-500 text-xs">{e.message}</span>} />
+      </div>
+    )
+    lastIndex = blockMatch.index + blockMatch[0].length
+  }
+  if (lastIndex < remaining.length) {
+    remaining = remaining.slice(lastIndex)
+    lastIndex = 0
+  } else {
+    remaining = ''
+  }
+
+  // 인라인 수식($...$) 처리
+  const inlineRegex = /\$([^$\n]+?)\$/g
+  let inlineMatch: RegExpExecArray | null
+  while ((inlineMatch = inlineRegex.exec(remaining)) !== null) {
+    if (inlineMatch.index > lastIndex) {
+      parts.push(<span key={`text-${lastIndex}`}>{remaining.slice(lastIndex, inlineMatch.index)}</span>)
+    }
+    parts.push(
+      <InlineMath key={`inline-${inlineMatch.index}`} math={inlineMatch[1]} renderError={e => <span className="text-red-500 text-xs">{e.message}</span>} />
+    )
+    lastIndex = inlineMatch.index + inlineMatch[0].length
+  }
+  if (lastIndex < remaining.length) {
+    parts.push(<span key={`text-end`}>{remaining.slice(lastIndex)}</span>)
+  }
+
+  return <div className="whitespace-pre-wrap">{parts}</div>
+}
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
@@ -53,7 +103,7 @@ export default function ChatBot({ currentProblem, subject, autoExplain }: Props)
     let prompt = `당신은 전기기사 시험 전문 튜터입니다.
 학생이 전기기사 기출문제를 풀면서 질문하는 것에 대해 도움을 줍니다.
 답변은 한국어로 작성하며, 쉬운 예시와 비유를 사용합니다.
-수식이나 공식이 필요하면 포함시켜 주세요.
+수식이나 공식이 필요하면 KaTeX 형식(예: $\\frac{a}{b}$, $x^2 + y^2 = z^2$, $$\\sum_{i=1}^{n} x_i$$)으로 자유롭게 표현해 주세요.
 답변은 간결하지만 충분한 설명을 포함해야 합니다.`
 
     if (subject) {
@@ -286,7 +336,11 @@ export default function ChatBot({ currentProblem, subject, autoExplain }: Props)
                   ? 'bg-blue-600 text-white rounded-br-md'
                   : 'bg-gray-100 text-gray-900 rounded-bl-md'
               }`}>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                {msg.role === 'user' ? (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                ) : (
+                  <MathMessage content={msg.content} />
+                )}
               </div>
             </div>
           ))}
