@@ -12,9 +12,10 @@ interface Message {
 interface Props {
   currentProblem?: Problem | null
   subject?: string
+  autoExplain?: number  // "AI에게 해설 요청" 트리거 (값이 바뀌면 자동 질문)
 }
 
-export default function ChatBot({ currentProblem, subject }: Props) {
+export default function ChatBot({ currentProblem, subject, autoExplain }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,10 +29,19 @@ export default function ChatBot({ currentProblem, subject }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // currentProblem 변경 시 패널 닫기 (다른 문제 선택 시)
+  // currentProblem 변경 시: autoExplain>0이면 자동 해설 요청, 아니면 패널 닫기
   useEffect(() => {
-    setIsOpen(false)
-  }, [currentProblem])
+    if (currentProblem && autoExplain && autoExplain > 0) {
+      setIsOpen(true)
+      setMessages([])
+      const text = '이 문제의 해설을 자세히 설명해주세요'
+      setInput(text)
+      // sendText는 input 상태에 의존 사용 안 함 → 바로 전송 가능
+      sendText(text)
+    } else {
+      setIsOpen(false)
+    }
+  }, [currentProblem, autoExplain])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -124,6 +134,17 @@ export default function ChatBot({ currentProblem, subject }: Props) {
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || loading) return
+
+    await doSend(text)
+  }
+
+  // 강제 텍스트 전송 (autoExplain 등에서 사용)
+  const sendText = async (text: string) => {
+    if (!text || loading) return
+    await doSend(text)
+  }
+
+  const doSend = async (text: string) => {
 
     let webResults = ''
     let dbResults = ''
@@ -327,7 +348,7 @@ export default function ChatBot({ currentProblem, subject }: Props) {
               style={{ minHeight: '42px', maxHeight: '120px' }}
             />
             <button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={loading || !input.trim()}
               className="shrink-0 bg-blue-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >

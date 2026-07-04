@@ -23,6 +23,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [chatProblem, setChatProblem] = useState<Problem | null>(null)
+  const [chatAutoAsk, setChatAutoAsk] = useState(0)  // autoExplain 트리거 (카운터)
   const [cycles, setCycles] = useState<string[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
 
@@ -105,6 +106,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
 
   const handleExplain = (problem: Problem) => {
     setChatProblem(problem)
+    setChatAutoAsk(prev => prev + 1)
   }
 
   if (loading && problems.length === 0) {
@@ -208,13 +210,13 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
 
         {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 */}
         <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white">
-          <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
+          <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
         </div>
       </div>
 
       {/* 모바일: ChatBot 플로팅 버튼은 항상 표시 (내부 isOpen + currentProblem 게이팅) */}
       <div className="md:hidden">
-        <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} />
+        <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
       </div>
     </div>
   )
