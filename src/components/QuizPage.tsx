@@ -208,8 +208,8 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
-        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 */}
-        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white">
+        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (sticky로 스크롤 시 고정) */}
+        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white sticky top-0 h-screen">
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
         </div>
       </div>
