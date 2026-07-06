@@ -209,8 +209,8 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
-        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (fixed로 스크롤과 무관하게 고정) */}
-        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white sticky top-0 self-start h-[calc(100vh-4rem)]">
+        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (헤더 아래 일반 column, 자체적으로 고정처럼 보임) */}
+        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white h-[calc(100vh-4rem)] overflow-hidden flex-col">
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
         </div>
       </div>
