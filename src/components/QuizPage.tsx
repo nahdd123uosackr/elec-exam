@@ -172,6 +172,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
       </header>
 
       <div className="flex-1 flex min-h-0">
+        {/* 문제 영역 (스크롤) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {problems.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
@@ -208,8 +209,8 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
-        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (sticky로 스크롤 시 고정) */}
-        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white sticky top-0 h-screen">
+        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (fixed로 스크롤과 무관하게 고정) */}
+        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white sticky top-0 self-start h-[calc(100vh-4rem)]">
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
         </div>
       </div>
