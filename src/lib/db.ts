@@ -90,7 +90,7 @@ export async function queryProblems(opts: {
     SELECT id, "문제", "정답", "해설", "사용공식", "출처", "회차", "과목", "난이도", "보기", "중복출제"
     FROM problems
     ${whereClause}
-    ORDER BY "회차" DESC NULLS LAST, id ASC
+    ORDER BY "회차" DESC NULLS LAST, "과목" ASC, id ASC
     LIMIT $${params.length - 1} OFFSET $${params.length}
   `
   const result = await pool.query(sql, params)

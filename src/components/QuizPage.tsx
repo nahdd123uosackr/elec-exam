@@ -165,8 +165,13 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
               className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm w-48 shrink-0" />
           </div>
 
-          <div className="text-sm text-gray-500 shrink-0">
+          <div className="text-sm text-gray-500 shrink-0 whitespace-nowrap">
             <strong className="text-gray-900">{total.toLocaleString()}</strong>개
+            {total > 0 && (
+              <span className="ml-1 text-gray-400">
+                ({(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, total)})
+              </span>
+            )}
           </div>
         </div>
       </header>

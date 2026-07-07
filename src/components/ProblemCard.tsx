@@ -82,6 +82,7 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
   const [showExplain, setShowExplain] = useState(false)
 
   const qNo = parseInt((problem.문제 || '').match(/^(\d+)/)?.[1] || '0', 10)
+  const problemNumber = (index ?? 0) + 1  // 1-based sequential number
   const correctAnswers = normalizeAnswer(problem.정답 || '')
   const isAnswered = pick !== undefined
   const isCorrect = isAnswered && correctAnswers.includes(pick)
@@ -118,7 +119,8 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">{problem.회차}</span>
           <span className="rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs font-medium">{problem.과목}</span>
-          {qNo > 0 && <span className="rounded-full bg-purple-100 text-purple-700 px-2 py-0.5 text-xs font-medium">{qNo}번</span>}
+          {problemNumber > 0 && <span className="rounded-full bg-purple-100 text-purple-700 px-2 py-0.5 text-xs font-medium">#{problemNumber}</span>}
+          {qNo > 0 && <span className="rounded-full bg-purple-50 text-purple-500 px-2 py-0.5 text-xs">{qNo}번</span>}
           {problem.난이도 && <span className="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-xs font-medium">{problem.난이도}</span>}
           {dupCount >= 3 && (
             <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-medium" title={`총 ${dupCount}회 출제`}>
