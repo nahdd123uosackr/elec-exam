@@ -63,12 +63,13 @@ export async function queryProblems(opts: {
       // 단독 출제 (1회)
       where.push(`("중복출제" IS NULL OR "중복출제" = '')`)
     } else if (opts.dupCount === 2) {
-      // 정확히 2회 (콤마 1개)
-      where.push(`"중복출제" IS NOT NULL AND "중복출제" != '' AND (length("중복출제") - length(replace("중복출제", ',', ''))) = 1`)
+      // 정확히 2회: 다른 회차 1개 (콤마 0개)
+      where.push(`"중복출제" IS NOT NULL AND "중복출제" != '' AND "중복출제" NOT LIKE '%,%'`)
     } else {
-      // 3회 이상 (콤마 2개 이상, 총 출제 횟수 >= N)
+      // N회 이상: 총 출제 횟수 = split(',').length + 1 = 콤마개수 + 2
+      // 콤마개수 + 2 >= N
       params.push(opts.dupCount)
-      where.push(`"중복출제" IS NOT NULL AND "중복출제" != '' AND (length("중복출제") - length(replace("중복출제", ',', '')) + 1) >= $${params.length}`)
+      where.push(`"중복출제" IS NOT NULL AND "중복출제" != '' AND (length("중복출제") - length(replace("중복출제", ',', '')) + 2) >= $${params.length}`)
     }
   }
   if (opts.search) {
