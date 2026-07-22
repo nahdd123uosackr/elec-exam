@@ -1,56 +1,42 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { InlineMath, BlockMath } from 'react-katex'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import type { Problem } from '../types/Problem'
 
-// 수식(LaTeX/KaTeX)을 포함한 텍스트를 파싱해 react-katex로 렌더링
+// 마크다운 + 수식(LaTeX/KaTeX)을 HTML로 깔끔하게 렌더링
 function MathMessage({ content }: { content: string }) {
-  // $$...$$ (블록) → BlockMath
-  // $...$ (인라인) → InlineMath
-  // 그 외 텍스트 → 일반 텍스트
-  const parts: React.ReactNode[] = []
-  let remaining = content
-  let lastIndex = 0
-
-  // 먼저 블록 수식($$...$$) 처리
-  const blockRegex = /\$\$([\s\S]*?)\$\$/g
-  let blockMatch: RegExpExecArray | null
-  while ((blockMatch = blockRegex.exec(remaining)) !== null) {
-    if (blockMatch.index > lastIndex) {
-      parts.push(<span key={`text-${lastIndex}`}>{remaining.slice(lastIndex, blockMatch.index)}</span>)
-    }
-    parts.push(
-      <div key={`block-${blockMatch.index}`} className="my-2">
-        <BlockMath math={blockMatch[1]} renderError={e => <span className="text-red-500 text-xs">{e.message}</span>} />
-      </div>
-    )
-    lastIndex = blockMatch.index + blockMatch[0].length
-  }
-  if (lastIndex < remaining.length) {
-    remaining = remaining.slice(lastIndex)
-    lastIndex = 0
-  } else {
-    remaining = ''
-  }
-
-  // 인라인 수식($...$) 처리
-  const inlineRegex = /\$([^$\n]+?)\$/g
-  let inlineMatch: RegExpExecArray | null
-  while ((inlineMatch = inlineRegex.exec(remaining)) !== null) {
-    if (inlineMatch.index > lastIndex) {
-      parts.push(<span key={`text-${lastIndex}`}>{remaining.slice(lastIndex, inlineMatch.index)}</span>)
-    }
-    parts.push(
-      <InlineMath key={`inline-${inlineMatch.index}`} math={inlineMatch[1]} renderError={e => <span className="text-red-500 text-xs">{e.message}</span>} />
-    )
-    lastIndex = inlineMatch.index + inlineMatch[0].length
-  }
-  if (lastIndex < remaining.length) {
-    parts.push(<span key={`text-end`}>{remaining.slice(lastIndex)}</span>)
-  }
-
-  return <div className="whitespace-pre-wrap">{parts}</div>
+  return (
+    <div className="markdown-body text-sm leading-relaxed">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1.5 first:mt-0">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-base font-bold mt-3 mb-1.5 first:mt-0">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-sm font-bold mt-2.5 mb-1 first:mt-0">{children}</h3>,
+          ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-0.5">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-0.5">{children}</ol>,
+          li: ({ children }) => <li>{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          code: ({ children }) => <code className="bg-gray-200 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+          pre: ({ children }) => <pre className="bg-gray-800 text-gray-100 rounded-lg p-3 mb-2 overflow-x-auto text-xs">{children}</pre>,
+          blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-3 my-2 text-gray-600 italic">{children}</blockquote>,
+          hr: () => <hr className="my-3 border-gray-300" />,
+          table: ({ children }) => <div className="overflow-x-auto mb-2"><table className="min-w-full text-xs border-collapse">{children}</table></div>,
+          th: ({ children }) => <th className="border border-gray-300 px-2 py-1 bg-gray-100 font-semibold text-left">{children}</th>,
+          td: ({ children }) => <td className="border border-gray-300 px-2 py-1">{children}</td>,
+          a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 underline">{children}</a>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
 }
 
 interface Message {
