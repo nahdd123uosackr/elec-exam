@@ -30,8 +30,9 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   // 데스크톱: AI 튜터 패널 가로 크기 조절
   const CHAT_WIDTH_KEY = 'chatPanelWidth'
   const CHAT_WIDTH_MIN = 320
-  const CHAT_WIDTH_MAX = 800
+  const CHAT_WIDTH_MAX_RATIO = 0.7  // 화면 너비의 최대 70%까지
   const CHAT_WIDTH_DEFAULT = 420
+  const getChatWidthMax = () => typeof window !== 'undefined' ? Math.max(CHAT_WIDTH_MIN, window.innerWidth * CHAT_WIDTH_MAX_RATIO) : 800
   const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT)
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartX = useRef(0)
@@ -42,7 +43,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(CHAT_WIDTH_KEY) : null
     if (saved) {
       const w = parseInt(saved, 10)
-      if (!Number.isNaN(w)) setChatWidth(Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, w)))
+      if (!Number.isNaN(w)) setChatWidth(Math.min(getChatWidthMax(), Math.max(CHAT_WIDTH_MIN, w)))
     }
   }, [])
 
@@ -59,7 +60,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     const handleMouseMove = (e: MouseEvent) => {
       // 패널이 화면 우측에 있으므로 왼쪽으로 드래그하면 넓어짐
       const delta = resizeStartX.current - e.clientX
-      const newWidth = Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, resizeStartWidth.current + delta))
+      const newWidth = Math.min(getChatWidthMax(), Math.max(CHAT_WIDTH_MIN, resizeStartWidth.current + delta))
       setChatWidth(newWidth)
     }
 
