@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import type { Problem } from '../types/Problem'
 import ProblemCard from './ProblemCard'
@@ -26,6 +26,63 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   const [chatAutoAsk, setChatAutoAsk] = useState(0)  // autoExplain 트리거 (카운터)
   const [cycles, setCycles] = useState<string[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
+
+  // 데스크톱: AI 튜터 패널 가로 크기 조절
+  const CHAT_WIDTH_KEY = 'chatPanelWidth'
+  const CHAT_WIDTH_MIN = 320
+  const CHAT_WIDTH_MAX = 800
+  const CHAT_WIDTH_DEFAULT = 420
+  const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStartX = useRef(0)
+  const resizeStartWidth = useRef(CHAT_WIDTH_DEFAULT)
+
+  // 저장된 너비 복원
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(CHAT_WIDTH_KEY) : null
+    if (saved) {
+      const w = parseInt(saved, 10)
+      if (!Number.isNaN(w)) setChatWidth(Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, w)))
+    }
+  }, [])
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizeStartX.current = e.clientX
+    resizeStartWidth.current = chatWidth
+    setIsResizing(true)
+  }, [chatWidth])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // 패널이 화면 우측에 있으므로 왼쪽으로 드래그하면 넓어짐
+      const delta = resizeStartX.current - e.clientX
+      const newWidth = Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, resizeStartWidth.current + delta))
+      setChatWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      setChatWidth(w => {
+        localStorage.setItem(CHAT_WIDTH_KEY, String(w))
+        return w
+      })
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
 
   const PAGE_SIZE = 20
 
@@ -214,8 +271,17 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
           )}
         </div>
 
-        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시 (헤더 아래 일반 column, 자체적으로 고정처럼 보임) */}
-        <div className="hidden md:flex w-96 lg:w-[420px] shrink-0 border-l border-gray-200 bg-white h-[calc(100vh-4rem)] overflow-hidden flex-col">
+        {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시, 드래그로 가로 크기 조절 가능 */}
+        <div
+          className="hidden md:flex shrink-0 border-l border-gray-200 bg-white h-[calc(100vh-4rem)] overflow-hidden flex-col relative"
+          style={{ width: chatWidth }}
+        >
+          {/* 리사이즈 핸들 */}
+          <div
+            onMouseDown={handleResizeStart}
+            className={`hidden md:block absolute left-0 top-0 bottom-0 w-1.5 -ml-0.5 cursor-col-resize z-10 hover:bg-blue-400/50 transition-colors ${isResizing ? 'bg-blue-500/60' : ''}`}
+            title="드래그하여 크기 조절"
+          />
           <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
         </div>
       </div>
