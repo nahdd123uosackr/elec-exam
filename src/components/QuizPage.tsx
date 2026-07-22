@@ -273,16 +273,20 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
 
         {/* 데스크톱: 우측 AI 튜터 패널 — md 이상에서만 표시, 드래그로 가로 크기 조절 가능 */}
         <div
-          className="hidden md:flex shrink-0 border-l border-gray-200 bg-white h-[calc(100vh-4rem)] overflow-hidden flex-col relative"
+          className="hidden md:flex shrink-0 relative"
           style={{ width: chatWidth }}
         >
-          {/* 리사이즈 핸들 */}
+          {/* 리사이즈 핸들: 패널 왼쪽 경계에 항상 보이는 그립 바 */}
           <div
             onMouseDown={handleResizeStart}
-            className={`hidden md:block absolute left-0 top-0 bottom-0 w-1.5 -ml-0.5 cursor-col-resize z-10 hover:bg-blue-400/50 transition-colors ${isResizing ? 'bg-blue-500/60' : ''}`}
+            className={`hidden md:flex items-center justify-center absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize z-20 group`}
             title="드래그하여 크기 조절"
-          />
-          <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
+          >
+            <div className={`w-1 h-10 rounded-full transition-colors ${isResizing ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-400'}`} />
+          </div>
+          <div className="flex flex-col w-full border-l border-gray-200 bg-white h-[calc(100vh-4rem)] overflow-hidden">
+            <ChatBot currentProblem={chatProblem} subject={selectedSubject !== 'all' ? selectedSubject : undefined} autoExplain={chatAutoAsk} />
+          </div>
         </div>
       </div>
 
