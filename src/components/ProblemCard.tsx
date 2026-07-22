@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import type { Problem } from '../types/Problem'
 import { InlineMath, BlockMath } from 'react-katex'
+import MarkdownMessage from './MarkdownMessage'
 
 /** 이미지/수식 렌더링 */
 function renderWithImages(text: string): React.ReactNode {
@@ -49,6 +50,20 @@ function renderWithImages(text: string): React.ReactNode {
       return <span key={`${bi}-${pi}`}>{part}</span>
     })
   })
+}
+
+/** 해설 텍스트가 줄바꿈 없이 한 줄로 이어져 있어도 문장/단계 단위로 보기 좋게 줄바꿈 삽입 */
+function normalizeExplanation(text: string): string {
+  if (!text) return text
+  // 이미 줄바꿈이 여러 개 있으면(문단 구분 존재) 그대로 사용
+  if (/\n\s*\n/.test(text) || (text.match(/\n/g)?.length ?? 0) >= 2) return text
+
+  let result = text
+  // 마침표/물음표 뒤에 공백이 오면 문장 구분으로 보고 줄바꿈 삽입 (단, 소수점 숫자는 보호)
+  result = result.replace(/([.!?])\s+(?=[가-힣A-Z])/g, '$1\n\n')
+  // "다시 계산:", "따라서" 등 재계산/결론 전환 표현 앞에서도 줄바꿈
+  result = result.replace(/\s*(다시 계산:|따라서|즉,)/g, '\n\n$1')
+  return result
 }
 
 function parseChoice(raw: string, idx: number) {
@@ -192,16 +207,16 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
           </div>
 
           {problem.해설 && (
-            <div className="rounded-md bg-gray-50 border border-gray-200 p-3 text-sm text-gray-800 whitespace-pre-line">
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-3">
               <div className="text-xs font-semibold text-gray-500 mb-1">해설</div>
-              {renderWithImages(problem.해설)}
+              <MarkdownMessage content={normalizeExplanation(problem.해설)} />
             </div>
           )}
 
           {problem.사용공식 && (
-            <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm font-mono text-blue-700">
-              <div className="text-xs font-semibold text-gray-500 mb-1 font-sans">사용 공식</div>
-              {problem.사용공식}
+            <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+              <div className="text-xs font-semibold text-gray-500 mb-1">사용 공식</div>
+              <MarkdownMessage content={normalizeExplanation(problem.사용공식)} className="text-blue-700" />
             </div>
           )}
 
