@@ -263,10 +263,10 @@ export default function ChatBot({ currentProblem, subject, autoExplain }: Props)
       <div
         ref={panelRef}
         className={`
-          chat-panel bg-white border-l border-gray-200
+          chat-panel bg-white md:border-l-0 border-l border-gray-200
           fixed md:static left-0 bottom-0 z-40 md:z-auto
           ${isOpen ? 'flex' : 'hidden'} md:flex
-          flex-col w-full md:w-96 lg:w-[420px] h-[70vh] md:h-full
+          flex-col w-full md:w-full h-[70vh] md:h-full
           transform-gpu
           ${isOpen ? 'translate-y-0' : 'translate-y-full'}
           transition-transform duration-300 ease-out
