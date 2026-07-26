@@ -263,7 +263,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
               <span className="text-sm text-gray-600">
                 {currentPage} / {totalPages}
               </span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              <button onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                 disabled={currentPage === totalPages}
                 className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-100">
                 다음 →
