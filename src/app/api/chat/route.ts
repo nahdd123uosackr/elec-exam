@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const OMNI_BASE_URL = process.env.OMNI_BASE_URL || 'https://omni.nhd.us.to/v1'
+const OMNI_BASE_URL = process.env.OMNI_BASE_URL || 'https://api.kilo.ai/api/gateway/v1'
 const OMNI_API_KEY = process.env.OMNI_API_KEY || ''
-const OMNI_MODEL = process.env.OMNI_MODEL || 'newapi1'
+const OMNI_MODEL = process.env.OMNI_MODEL || 'kilo-auto/free'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,12 +23,13 @@ export async function POST(req: NextRequest) {
       ? [{ ...messages[0], content: enhancedSystem }, ...messages.slice(1)]
       : [{ role: 'system', content: enhancedSystem }, ...messages]
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    // kilo-auto/free 등 키 불필요 게이트웨이를 위해 키가 있을 때만 헤더 첨부
+    if (OMNI_API_KEY) headers['Authorization'] = `Bearer ${OMNI_API_KEY}`
+
     const res = await fetch(`${OMNI_BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OMNI_API_KEY}`,
-      },
+      headers,
       body: JSON.stringify({
         model: OMNI_MODEL,
         messages: finalMessages,
