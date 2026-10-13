@@ -9,8 +9,8 @@
 ## 기술 스택
 - Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - 렌더링: react-markdown + remark-gfm + remark-math + rehype-katex (수식/KaTeX), 자체 `MarkdownMessage` 컴포넌트
-- 데이터: **`data/problems.json`이 유일한 source of truth** (Postgres는 과거 구현, 현재 라우트에서 미사용 — `src/lib/db.ts`는 레거시)
-- AI 튜터: `/api/chat` → 외부 OpenAI-호환 엔드포인트 (`OMNI_BASE_URL`, `.env`에 설정)
+- 데이터: **`data/problems.json`이 유일한 source of truth**. 단 프로덕션 라우트는 원격 Postgres(`nhd.us.to:5432`, DB `elec`, oracle1 k3s postgres pod)를 조회 → JSON↔DB 동기화는 `scripts/sync_pg.py` (`--dry`/`--apply`)
+- AI 튜터: `/api/chat` → kilo 게이트웨이 `https://api.kilo.ai/api/gateway/v1`, 모델 `kilo-auto/free` (API 키 불필요 — `OMNI_API_KEY` 설정 시에만 Authorization 첨부)
 - 웹검색: `/api/search` → DuckDuckGo HTML 스크래핑
 
 ## 디렉터리 구조
@@ -40,8 +40,8 @@ src/
     ChatBot.tsx          # AI 튜터 패널 (리사이즈, localStorage)
     MarkdownMessage.tsx  # 마크다운+KaTeX 렌더러
   lib/
-    data.ts              # problems.json 로드/필터/검색 (캐시)
-    db.ts                # (레거시) Postgres 쿼리 — 현재 라우트에서 사용 안 함
+    data.ts              # problems.json 직접 로드/필터 (현재 라우트는 미사용)
+    db.ts                # Postgres 쿼리 — 프로덕션 라우트가 사용
   types/Problem.ts       # Problem 타입
 scripts/                 # 수집/정제/검증 파이썬 스크립트
   verify_kinz.py            # kinz 정답/해설 수집 (Playwright, "해설" 버튼 클릭 → /exam/cA)
@@ -50,6 +50,8 @@ scripts/                 # 수집/정제/검증 파이썬 스크립트
   compare_sources.py        # 원본 수집본 vs problems.json 대조 리포트
   fix_data.py               # 원본 기준으로 일괄 수정 (정답/지문/보기/회차/이미지/중복)
   generate_explanations.py  # 해설 결손분 AI 생성 (원본 해설 우선)
+  merge_explanations.py     # 샤드 결과를 problems.json 에 병합
+  sync_pg.py                # problems.json → 원격 Postgres 반영 (--dry / --apply)
 public/images/kinz/      # kinz 문제·보기 이미지 (gif, ~2900개)
 public/images/cbtbank/   # cbtbank 문제·보기 이미지 (gif, 569개)
 ```
