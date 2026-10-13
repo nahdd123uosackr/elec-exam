@@ -1,0 +1,94 @@
+# AGENTS.md — 전기기사 기출문제 학습 사이트
+
+## 프로젝트 개요
+- 전기기사(필기) 기출문제를 풀 수 있게 만든 웹 사이트. 문제 데이터는 외부 기출문제 사이트에서 수집.
+- **출처**: kinz.kr (대부분), cbtbank.kr
+- **배포**: GitHub 저장소에 push하면 Vercel이 자동 배포 → https://electrician-exam-web.vercel.app
+- 로컬 개발: `npm run build` (Next.js 14.2, App Router)
+
+## 기술 스택
+- Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- 렌더링: react-markdown + remark-gfm + remark-math + rehype-katex (수식/KaTeX), 자체 `MarkdownMessage` 컴포넌트
+- 데이터: **`data/problems.json`이 유일한 source of truth** (Postgres는 과거 구현, 현재 라우트에서 미사용 — `src/lib/db.ts`는 레거시)
+- AI 튜터: `/api/chat` → 외부 OpenAI-호환 엔드포인트 (`OMNI_BASE_URL`, `.env`에 설정)
+- 웹검색: `/api/search` → DuckDuckGo HTML 스크래핑
+
+## 디렉터리 구조
+```
+data/
+  problems.json          # 문제 DB (앱이 직접 읽음, 유일한 source of truth)
+  verified_kinz/         # (검증 산출물) kinz 원본 정답/해설 수집 — Playwright
+  verified_kinz_static/  # (검증 산출물) kinz 원본 지문/보기/이미지 — 정적 파싱
+  verified_cbtbank/      # (검증 산출물) cbtbank 원본 정답/보기 — 정적 파싱
+  explain_progress.json  # 해설 생성 진행 상태 (중단/재개용)
+  kinz_batch*.json 등    # 과거 수집/배치 중간 산출물 (참고용)
+src/
+  app/
+    page.tsx             # 홈 (통계)
+    subject/page.tsx     # 과목별 풀이
+    cycle/page.tsx       # 회차별 풀이
+    dup-two/page.tsx     # 2회 출제 문제
+    dup-high/page.tsx    # 3회 이상 출제 문제
+    api/problems/route.ts      # 목록 조회 (페이징/필터)
+    api/problems/[id]/route.ts # 단건 조회
+    api/stats/route.ts         # 통계
+    api/search/route.ts        # 웹검색 (AI용)
+    api/chat/route.ts          # AI 튜터 채팅
+  components/
+    ProblemCard.tsx      # 문제 카드 (보기 분리, 정답 판정, 마커 정규화)
+    QuizPage.tsx         # 풀이 화면 (API 호출 + 필터)
+    ChatBot.tsx          # AI 튜터 패널 (리사이즈, localStorage)
+    MarkdownMessage.tsx  # 마크다운+KaTeX 렌더러
+  lib/
+    data.ts              # problems.json 로드/필터/검색 (캐시)
+    db.ts                # (레거시) Postgres 쿼리 — 현재 라우트에서 사용 안 함
+  types/Problem.ts       # Problem 타입
+scripts/                 # 수집/정제/검증 파이썬 스크립트
+  verify_kinz.py            # kinz 정답/해설 수집 (Playwright, "해설" 버튼 클릭 → /exam/cA)
+  extract_kinz_static.py    # kinz 지문/보기/이미지 정적 파싱
+  verify_cbtbank.py         # cbtbank 정답/보기 정적 파싱 (correct="N" 속성)
+  compare_sources.py        # 원본 수집본 vs problems.json 대조 리포트
+  fix_data.py               # 원본 기준으로 일괄 수정 (정답/지문/보기/회차/이미지/중복)
+  generate_explanations.py  # 해설 결손분 AI 생성 (원본 해설 우선)
+public/images/kinz/      # kinz 문제·보기 이미지 (gif, ~2900개)
+public/images/cbtbank/   # cbtbank 문제·보기 이미지 (gif, 569개)
+```
+
+## 데이터 스키마 (`data/problems.json` 원소)
+| 필드 | 설명 |
+|---|---|
+| `id` | UUID |
+| `문제` | 지문. 이미지는 `[이미지: /images/kinz|/images/cbtbank/<파일>]` (로컬 경로) |
+| `보기` | 4개 보기를 `\n`으로 구분, 마커 `①②③④`. 이미지 보기도 `[이미지: ...]` 포함 |
+| `정답` | `①`~`④` (원본 기준 교정 완료). UI `normalizeAnswer()`는 숫자·복수답도 허용 |
+| `해설` | 풀이 텍스트 |
+| `사용공식` | 요약 공식 |
+| `출처` | 원본 URL (`https://www.kinz.kr/exam/<id>` / `https://cbtbank.kr/exam/kt<yyyymmdd>`) |
+| `회차` | `YYYY. M. D.` 로 정규화됨 |
+| `과목` / `난이도` | 분류/배지 |
+| `중복출제` | (선택) 콤마 구분 회차 목록 — **현재 JSON에 없음** → dup-two/dup-high 필터는 빈 결과 |
+
+### UI 판정 로직 (ProblemCard.tsx)
+- 보기: 개행 단위 split → 중복 마커(`① ①`), `1. ①`, `1.` 접두어 제거 → 4버튼 생성
+- 정답: `①`~`⑤` / 숫자 / 콤마 복수 허용
+- 이미지 마커: `[이미지: /images/...]` → `<img>`, LaTeX가 들어 있으면 KaTeX로 렌더
+
+## 데이터 수정 원칙 (작업 시 반드시 준수)
+1. **원본 우선**: 정답/보기/지문이 틀렸을 때는 `data/verified_*` 수집본을 근거로 교체한다. 추측으로 바꾸지 않는다.
+2. **원본 신뢰성 확인됨**: kinz 수집 정답은 독립 출처(moducbt/comcbt/cbtkr)와 KEC 기준으로 교차 검증 완료. 예) 연동선 최소 굵기 2.5mm², 345/154kV 이격거리 5.48m.
+3. **정답 변경 금지 아님**: 원본 수집본에 명확히 있을 때만 바꾸고, 변경 로그를 남긴다.
+4. **가답안 문제**: 지문에 "가답안 발표시 N번 / 확정답안 …" 이 쓰인 오류 공지 문제는 지문에 명시된 번호를 정답으로 유지한다.
+5. **형식 정규화**: 회차는 `YYYY. M. D.`, 보기 마커 중복 제거, 잡라인(`. <`, `. >`) 제거, HTML 엔티티 디코드.
+6. **해설**: 근거 없는 생성 해설은 쓰지 않는다. 원본 해설 우선, 없으면 AI로 개념·공식 중심 생성(`generate_explanations.py`).
+7. **변경 후 검증**: `python3 scripts/compare_sources.py` 로 원본 대조, `npx tsc --noEmit` + `npm run build` 확인.
+
+## ⚠️ 보안 (필수)
+- **DB 비밀번호·API 키를 코드에 절대 하드코딩하지 않는다.** `os.environ["PG_PASSWORD"]` 로만 읽는다.
+- `.env` 는 `.gitignore` 처리됨 — 커밋 금지. (2026-10-13 과거 커밋 이력에서 평문 비밀번호 제거 완료 → 해당 DB 비밀번호는 변경된 것으로 간주하고 재사용 금지)
+- `scripts/pg_*.py` 는 `.gitignore` 대상(비밀값 포함) — 원격 push 금지.
+
+## 작업 방식
+- 문제 데이터 일괄 수정은 `scripts/`에 파이썬 스크립트를 만들어 실행하고 스크립트를 남긴다 (재현 가능해야 함).
+- 수집한 외부 HTML은 신뢰하지 않고 고정 패턴으로만 파싱한다.
+- 장기 실행 작업(원본 수집, 해설 생성)은 `nohup … &` + 진행 파일로 중단/재개 가능하게 만든다.
+- push 직전 `npm run build` 로 빌드 검증.

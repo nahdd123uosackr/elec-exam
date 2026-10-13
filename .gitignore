@@ -39,3 +39,11 @@ scripts/pg_*.py
 # Local-only env
 .env
 .env.local
+
+# 생성/작업 중간 산출물
+data/explain_part_*.json
+data/explain_progress.json
+data/kinz_batch*.json
+data/problems_*.json
+!data/problems.json
+__pycache__/
