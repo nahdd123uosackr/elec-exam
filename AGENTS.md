@@ -10,7 +10,7 @@
 - Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - 렌더링: react-markdown + remark-gfm + remark-math + rehype-katex (수식/KaTeX), 자체 `MarkdownMessage` 컴포넌트
 - 데이터: **`data/problems.json`이 유일한 source of truth**. 단 프로덕션 라우트는 원격 Postgres(`nhd.us.to:5432`, DB `elec`, oracle1 k3s postgres pod)를 조회 → JSON↔DB 동기화는 `scripts/sync_pg.py` (`--dry`/`--apply`)
-- AI 튜터: `/api/chat` → kilo 게이트웨이 `https://api.kilo.ai/api/gateway/v1`, 모델 `kilo-auto/free` (API 키 불필요 — `OMNI_API_KEY` 설정 시에만 Authorization 첨부)
+- AI 튜터: `/api/chat` → kilo 게이트웨이 `https://api.kilo.ai/api/gateway/v1`, 기본 모델 `kilo-auto/free` (API 키 불필요, Authorization 헤더 없음. 일시적 혼잡 시 동일 게이트웨이 free 모델로 자동 폴백)
 - 웹검색: `/api/search` → DuckDuckGo HTML 스크래핑
 
 ## 디렉터리 구조

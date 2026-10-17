@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const OMNI_BASE_URL = process.env.OMNI_BASE_URL || 'https://api.kilo.ai/api/gateway/v1'
-const OMNI_API_KEY = process.env.OMNI_API_KEY || ''
-const OMNI_MODEL = process.env.OMNI_MODEL || 'kilo-auto/free'
+// 사용자 지정: baseurl은 https://api.kilo.ai/api/gateway/v1, 모델은 kilo-auto/free, apikey는 붙이지 않음.
+// Vercel의 레거시 OMNI_BASE_URL 환경변수로 인한 404 오염을 원천 방지하기 위해 KILO URL을 직접 기본값으로 고정.
+const KILO_BASE_URL = process.env.KILO_BASE_URL || 'https://api.kilo.ai/api/gateway/v1'
+const PRIMARY_MODEL = 'kilo-auto/free'
 
-// 주 모델(kilo-auto/free)의 업스트림이 혼잡하면(429/5xx) 자동 전환할 안정 free 모델.
-// kilo-auto/free 는 업스트림(Novita 등) 부하에 따라 간헐적으로 실패한다.
+// kilo-auto/free 는 업스트림 부하에 따라 간헐적으로 429/5xx 가 발생할 수 있으므로,
+// 동일 kilo 게이트웨이의 안정적인 무료 모델로 자동 폴백.
 const FALLBACK_MODELS = [
   'nvidia/nemotron-3.5-lightning:free',
   'openrouter/free',
@@ -23,11 +24,10 @@ interface ChatResult {
 }
 
 async function callChat(model: string, messages: any[], signal?: AbortSignal): Promise<ChatResult> {
+  // 사용자 지시: "apikey는 붙이지 않는다" -> Authorization 헤더 완전 제외
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  // kilo-auto/free 등 키 불필요 게이트웨이: 키가 있을 때만 Authorization 첨부
-  if (OMNI_API_KEY) headers['Authorization'] = `Bearer ${OMNI_API_KEY}`
 
-  const res = await fetch(`${OMNI_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${KILO_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers,
     signal,
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         ? [{ ...messages[0], content: enhancedSystem }, ...messages.slice(1)]
         : [{ role: 'system', content: enhancedSystem }, ...messages]
 
-    const candidates = [OMNI_MODEL, ...FALLBACK_MODELS]
+    const candidates = [PRIMARY_MODEL, ...FALLBACK_MODELS]
     let lastResult: ChatResult | null = null
     for (const model of candidates) {
       try {
@@ -88,13 +88,21 @@ export async function POST(req: NextRequest) {
         lastResult = { ok: false, status: 500, error: e?.message || '네트워크 오류', model }
       }
       if (lastResult.ok) {
-        if (lastResult.model !== OMNI_MODEL) {
-          console.warn(`[chat] ${OMNI_MODEL} 실패 → ${lastResult.model} 로 폴백`)
+        if (lastResult.model !== PRIMARY_MODEL) {
+          console.warn(`[chat] ${PRIMARY_MODEL} 실패 → ${lastResult.model} 로 폴백 성공`)
         }
         return NextResponse.json(lastResult.data)
       }
-      // 429/5xx/빈응답이면 다음 후보 모델로, 그 외(4xx 등)는 즉시 반환
-      if (lastResult.status < 500 && lastResult.status !== 502) {
+
+      // 일시적 혼잡(429), 모델 없음/에러(404), 서버 장애(5xx), 빈 응답(502)인 경우 다음 후보 모델 시도
+      const canFallback =
+        lastResult.status === 429 ||
+        lastResult.status === 404 ||
+        lastResult.status === 502 ||
+        lastResult.status >= 500
+
+      if (!canFallback) {
+        // 400 Bad Request, 401 Unauthorized 등 클라이언트 요청 문제는 즉시 반환
         console.error('Chat API 오류:', lastResult.status, lastResult.error?.slice(0, 200))
         return NextResponse.json(
           { error: `API 오류: ${lastResult.status}` },
@@ -106,7 +114,10 @@ export async function POST(req: NextRequest) {
 
     const status = lastResult?.status ?? 502
     console.error('Chat API 모든 모델 실패:', status, lastResult?.error?.slice(0, 200))
-    return NextResponse.json({ error: `API 오류: ${status}` }, { status })
+    return NextResponse.json(
+      { error: `AI 응답 생성 실패 (${status}). 잠시 후 다시 시도해주세요.` },
+      { status }
+    )
   } catch (err: any) {
     console.error('Chat API error:', err)
     return NextResponse.json({ error: err.message || '서버 오류' }, { status: 500 })
