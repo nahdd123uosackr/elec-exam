@@ -132,16 +132,25 @@ export async function searchProblemsForRAG(query: string, limit = 5): Promise<Pr
   return result.rows as ProblemRow[]
 }
 
+export function parseCycleDate(cycle: string): number {
+  const m = cycle.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/)
+  if (!m) return 0
+  return parseInt(m[1], 10) * 10000 + parseInt(m[2], 10) * 100 + parseInt(m[3], 10)
+}
+
 export async function getStats(): Promise<{
   total: number
   cycles: number
   subjects: number
   subjectsList: string[]
+  cyclesList: string[]
 }> {
   const pool = getPool()
   const total = (await pool.query('SELECT count(*)::int as c FROM problems')).rows[0].c
   const cycles = (await pool.query('SELECT count(DISTINCT "회차")::int as c FROM problems WHERE "회차" IS NOT NULL')).rows[0].c
   const subjects = (await pool.query('SELECT count(DISTINCT "과목")::int as c FROM problems WHERE "과목" IS NOT NULL')).rows[0].c
   const subjectsList = (await pool.query('SELECT DISTINCT "과목" FROM problems WHERE "과목" IS NOT NULL ORDER BY "과목"')).rows.map(r => r['과목'])
-  return { total, cycles, subjects, subjectsList }
+  const rawCycles = (await pool.query('SELECT DISTINCT "회차" FROM problems WHERE "회차" IS NOT NULL')).rows.map(r => r['회차']) as string[]
+  const cyclesList = rawCycles.sort((a, b) => parseCycleDate(b) - parseCycleDate(a))
+  return { total, cycles, subjects, subjectsList, cyclesList }
 }

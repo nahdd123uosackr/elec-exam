@@ -81,20 +81,29 @@ export function searchProblemsForRAG(query: string, limit = 5): Problem[] {
     .slice(0, limit)
 }
 
+export function parseCycleDate(cycle: string): number {
+  const m = cycle.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/)
+  if (!m) return 0
+  return parseInt(m[1], 10) * 10000 + parseInt(m[2], 10) * 100 + parseInt(m[3], 10)
+}
+
 export function getStats(): {
   total: number
   cycles: number
   subjects: number
   subjectsList: string[]
+  cyclesList: string[]
 } {
   const problems = loadProblems()
-  const cycles = new Set(problems.map(p => p.회차).filter(Boolean))
-  const subjects = new Set(problems.map(p => p.과목).filter(Boolean))
+  const cycles = new Set(problems.map(p => p.회차).filter(Boolean) as string[])
+  const subjects = new Set(problems.map(p => p.과목).filter(Boolean) as string[])
   const subjectsList = Array.from(subjects).sort()
+  const cyclesList = Array.from(cycles).sort((a, b) => parseCycleDate(b) - parseCycleDate(a))
   return {
     total: problems.length,
     cycles: cycles.size,
     subjects: subjects.size,
     subjectsList,
+    cyclesList,
   }
 }

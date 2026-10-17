@@ -9,6 +9,7 @@ interface Stats {
   cycles?: number
   subjects?: number
   subjectsList?: string[]
+  cyclesList?: string[]
   error?: string
 }
 

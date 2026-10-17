@@ -53,6 +53,7 @@ scripts/                 # 수집/정제/검증 파이썬 스크립트
   generate_explanations.py  # 해설 결손분 AI 생성 (원본 해설 우선)
   merge_explanations.py     # 샤드 결과를 problems.json 에 병합
   sync_pg.py                # problems.json → 원격 Postgres 반영 (--dry / --apply)
+  prune_legacy_problems.py  # Postgres 레거시 중복(6,199건) 삭제 및 42개 정규 회차 동기화
 public/images/kinz/      # kinz 문제·보기 이미지 (gif, ~2900개)
 public/images/cbtbank/   # cbtbank 문제·보기 이미지 (gif, 569개)
 ```
@@ -79,6 +80,9 @@ public/images/cbtbank/   # cbtbank 문제·보기 이미지 (gif, 569개)
   - 문제를 풀 때마다 정답/오답 여부, 선택 번호, 시도 횟수, 오답 횟수를 `localStorage` (`elec_exam_records_v1`)에 영구 저장
   - `ProblemCard` 상단에 이전 풀이 뱃지 실시간 표시 (`✅ 이전 풀이: 정답`, `❌ 이전 풀이: 오답`)
   - 오답이었던 문제를 다시 맞히면 `🎉 오답 탈출 성공!` 축하 뱃지 표시
+- **회차별 문제 풀이 (`/cycle`)**:
+  - `/api/stats`의 `cyclesList`를 활용해 **가장 최근 회차(예: `2022. 4. 24.`)를 기본값으로 자동 선택**하여 해당 회차의 문제만 로드
+  - "전체 회차" 옵션 없이 정규 42개 회차만 드롭다운에 표시되며, 불필요한 전체 덤프(`limit=9999`) 없음
 - **오답 문제 복습 모드 (`/wrong`)**:
   - 저장소의 오답 ID 목록을 읽어 `POST /api/problems`로 필터링 조회
   - 미해결 오답 / 전체 오답 이력 탭 전환, 회차/과목/검색 연동, 오답 노트 전체 초기화 지원

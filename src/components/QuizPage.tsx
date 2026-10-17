@@ -24,7 +24,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
-  const [selectedCycle, setSelectedCycle] = useState('all')
+  const [selectedCycle, setSelectedCycle] = useState(config.type === 'cycle' ? '' : 'all')
   const [selectedSubject, setSelectedSubject] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -115,13 +115,26 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
       .then(r => r.json())
       .then(data => {
         if (data.subjectsList) setSubjects(data.subjectsList)
+        if (data.cyclesList && data.cyclesList.length > 0) {
+          setCycles(data.cyclesList)
+          if (config.type === 'cycle') {
+            setSelectedCycle(prev => (prev && prev !== 'all' ? prev : data.cyclesList[0]))
+          }
+        }
       })
-      .catch(() => {})
-  }, [])
+      .catch((err) => {
+        console.error('통계 로드 실패:', err)
+      })
+  }, [config.type])
 
   // 문제 로드 (필터 변경 시마다)
   useEffect(() => {
     const fetchProblems = async () => {
+      // 회차별 풀이 모드에서는 최신 회차가 지정되기 전까지 전체 문제 조회를 방지
+      if (config.type === 'cycle' && (!selectedCycle || selectedCycle === 'all')) {
+        return
+      }
+
       setLoading(true)
       try {
         let res: Response
@@ -179,17 +192,6 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
         }))
         setProblems(rows)
         setTotal(data.total || 0)
-
-        // 회차 목록 (첫 페이지 + 첫 로딩 시만 갱신)
-        if (currentPage === 1 && cycles.length === 0) {
-          const allParams = new URLSearchParams()
-          allParams.set('limit', '9999')
-          const allRes = await fetch(`/api/problems?${allParams.toString()}`)
-          const allData = await allRes.json()
-          const uniqueCycles = Array.from(new Set((allData.rows || [])
-            .map((r: any) => r['회차']).filter(Boolean))) as string[]
-          setCycles(uniqueCycles.sort((a, b) => b.localeCompare(a)))
-        }
 
         setError(null)
       } catch (err: any) {
@@ -292,7 +294,10 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
             {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-two' || config.type === 'wrong') && (
               <select value={selectedCycle} onChange={e => setSelectedCycle(e.target.value)}
                 className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm shrink-0">
-                <option value="all">전체 회차</option>
+                {config.type !== 'cycle' && <option value="all">전체 회차</option>}
+                {cycles.length === 0 && config.type === 'cycle' && (
+                  <option value="">회차 로딩 중...</option>
+                )}
                 {cycles.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
