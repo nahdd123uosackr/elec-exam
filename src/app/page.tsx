@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { getStorageStats, subscribeStorage } from '../lib/storage'
 
 interface Stats {
   total?: number
@@ -13,12 +14,25 @@ interface Stats {
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [storageStats, setStorageStats] = useState({
+    totalSolved: 0,
+    totalCorrect: 0,
+    totalWrong: 0,
+    activeWrong: 0,
+  })
 
   useEffect(() => {
     fetch('/api/stats')
       .then(r => r.json())
       .then(setStats)
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    setStorageStats(getStorageStats())
+    return subscribeStorage(() => {
+      setStorageStats(getStorageStats())
+    })
   }, [])
 
   return (
@@ -36,6 +50,15 @@ export default function Home() {
             <span>📚 <strong className="text-gray-900">{stats.subjects ?? 0}</strong>과목</span>
           </div>
         )}
+        {storageStats.totalSolved > 0 && (
+          <div className="flex justify-center items-center gap-4 mt-3 text-xs text-gray-600">
+            <span className="bg-white/80 border border-gray-200 px-3.5 py-1.5 rounded-full shadow-xs">
+              내 풀이: <strong className="text-gray-900">{storageStats.totalSolved}</strong>문제 중{' '}
+              <strong className="text-emerald-600 font-semibold">{storageStats.totalCorrect}정답</strong> ·{' '}
+              <strong className="text-rose-600 font-semibold">{storageStats.activeWrong}오답</strong>
+            </span>
+          </div>
+        )}
         {stats && stats.error && (
           <div className="mt-3 text-xs text-red-400">통계 로드 실패: {stats.error}</div>
         )}
@@ -43,6 +66,29 @@ export default function Home() {
 
       <section className="max-w-4xl mx-auto px-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Link href="/wrong" className="menu-card group md:col-span-2 border-rose-200 hover:border-rose-400 bg-gradient-to-r from-rose-50/50 via-white to-orange-50/30">
+            <div className="text-4xl">📝</div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-gray-900 group-hover:text-rose-600 transition">오답 문제 풀이</h2>
+                {storageStats.activeWrong > 0 ? (
+                  <span className="bg-rose-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-xs">
+                    {storageStats.activeWrong}개 오답 복습
+                  </span>
+                ) : storageStats.totalSolved > 0 ? (
+                  <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                    ✅ 오답 없음
+                  </span>
+                ) : (
+                  <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                    오답 자동 수집
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">이전에 틀렸던 문제만 모아서 집중 복습하고 취약점을 보완하세요</p>
+            </div>
+          </Link>
+
           <Link href="/cycle" className="menu-card group">
             <div className="text-4xl">📋</div>
             <div>

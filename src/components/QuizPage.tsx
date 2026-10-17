@@ -5,9 +5,15 @@ import Link from 'next/link'
 import type { Problem } from '../types/Problem'
 import ProblemCard from './ProblemCard'
 import ChatBot from './ChatBot'
+import {
+  getWrongProblemIds,
+  getStorageStats,
+  clearAllRecords,
+  subscribeStorage,
+} from '../lib/storage'
 
 interface FilterConfig {
-  type: 'cycle' | 'subject' | 'dup-high' | 'dup-two'
+  type: 'cycle' | 'subject' | 'dup-high' | 'dup-two' | 'wrong'
   title: string
   subtitle: string
   icon: string
@@ -26,6 +32,22 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
   const [chatAutoAsk, setChatAutoAsk] = useState(0)  // autoExplain 트리거 (카운터)
   const [cycles, setCycles] = useState<string[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
+
+  // 풀이 기록 및 오답 통계 (localStorage)
+  const [storageStats, setStorageStats] = useState({
+    totalSolved: 0,
+    totalCorrect: 0,
+    totalWrong: 0,
+    activeWrong: 0,
+  })
+  const [wrongOnlyUnsolved, setWrongOnlyUnsolved] = useState(true)
+
+  useEffect(() => {
+    setStorageStats(getStorageStats())
+    return subscribeStorage(() => {
+      setStorageStats(getStorageStats())
+    })
+  }, [])
 
   // 데스크톱: AI 튜터 패널 가로 크기 조절
   const CHAT_WIDTH_KEY = 'chatPanelWidth'
@@ -102,18 +124,41 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     const fetchProblems = async () => {
       setLoading(true)
       try {
-        const params = new URLSearchParams()
-        params.set('limit', String(PAGE_SIZE))
-        params.set('offset', String((currentPage - 1) * PAGE_SIZE))
-        if (selectedCycle !== 'all') params.set('cycle', selectedCycle)
-        if (selectedSubject !== 'all') params.set('subject', selectedSubject)
-        if (searchQuery.trim()) params.set('q', searchQuery.trim())
+        let res: Response
+        if (config.type === 'wrong') {
+          const wrongIds = getWrongProblemIds({ onlyUnsolved: wrongOnlyUnsolved })
+          if (wrongIds.length === 0) {
+            setProblems([])
+            setTotal(0)
+            setLoading(false)
+            return
+          }
+          res = await fetch('/api/problems', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ids: wrongIds,
+              limit: PAGE_SIZE,
+              offset: (currentPage - 1) * PAGE_SIZE,
+              cycle: selectedCycle !== 'all' ? selectedCycle : undefined,
+              subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+              search: searchQuery.trim() || undefined,
+            }),
+          })
+        } else {
+          const params = new URLSearchParams()
+          params.set('limit', String(PAGE_SIZE))
+          params.set('offset', String((currentPage - 1) * PAGE_SIZE))
+          if (selectedCycle !== 'all') params.set('cycle', selectedCycle)
+          if (selectedSubject !== 'all') params.set('subject', selectedSubject)
+          if (searchQuery.trim()) params.set('q', searchQuery.trim())
 
-        // 중복 출제 필터
-        if (config.type === 'dup-high') params.set('dupCount', '3')
-        else if (config.type === 'dup-two') params.set('dupCount', '2')
+          // 중복 출제 필터
+          if (config.type === 'dup-high') params.set('dupCount', '3')
+          else if (config.type === 'dup-two') params.set('dupCount', '2')
 
-        const res = await fetch(`/api/problems?${params.toString()}`)
+          res = await fetch(`/api/problems?${params.toString()}`)
+        }
         const data = await res.json()
 
         if (!res.ok) throw new Error(data.error || '문제 로드 실패')
@@ -155,10 +200,10 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     }
 
     fetchProblems()
-  }, [config.type, selectedCycle, selectedSubject, searchQuery, currentPage])
+  }, [config.type, selectedCycle, selectedSubject, searchQuery, currentPage, wrongOnlyUnsolved])
 
   // 필터 변경 시 페이지 리셋
-  useEffect(() => { setCurrentPage(1) }, [selectedCycle, selectedSubject, searchQuery])
+  useEffect(() => { setCurrentPage(1) }, [selectedCycle, selectedSubject, searchQuery, wrongOnlyUnsolved])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -193,16 +238,58 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
     <div className="h-screen flex flex-col bg-gray-50">
       <header className="shrink-0 bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-full mx-auto flex items-center gap-4 flex-wrap">
-          <Link href="/" className="text-gray-400 hover:text-gray-700 text-xl shrink-0" title="메인으로">
-            ⚡
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/" className="text-gray-400 hover:text-gray-700 text-xl" title="메인으로">
+              ⚡
+            </Link>
+            <Link
+              href="/wrong"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition ${
+                config.type === 'wrong'
+                  ? 'bg-rose-50 text-rose-700 border-rose-300'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-rose-300 hover:text-rose-600'
+              }`}
+              title="오답 문제 모아보기"
+            >
+              <span>📝 오답 문제</span>
+              {storageStats.activeWrong > 0 && (
+                <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full leading-tight">
+                  {storageStats.activeWrong}
+                </span>
+              )}
+            </Link>
+          </div>
+
           <div className="shrink-0">
             <h1 className="text-lg font-bold text-gray-900">{config.icon} {config.title}</h1>
             <p className="text-xs text-gray-500">{config.subtitle}</p>
           </div>
 
           <div className="flex-1 flex items-center gap-3 overflow-x-auto">
-            {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-two') && (
+            {config.type === 'wrong' && (
+              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg shrink-0 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setWrongOnlyUnsolved(true)}
+                  className={`px-2.5 py-1 rounded-md font-medium transition ${
+                    wrongOnlyUnsolved ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  미해결 오답 ({storageStats.activeWrong})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWrongOnlyUnsolved(false)}
+                  className={`px-2.5 py-1 rounded-md font-medium transition ${
+                    !wrongOnlyUnsolved ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  전체 오답 이력 ({storageStats.totalWrong})
+                </button>
+              </div>
+            )}
+
+            {(config.type === 'cycle' || config.type === 'dup-high' || config.type === 'dup-two' || config.type === 'wrong') && (
               <select value={selectedCycle} onChange={e => setSelectedCycle(e.target.value)}
                 className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm shrink-0">
                 <option value="all">전체 회차</option>
@@ -210,7 +297,7 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
               </select>
             )}
 
-            {(config.type === 'subject' || config.type === 'dup-high' || config.type === 'dup-two') && (
+            {(config.type === 'subject' || config.type === 'dup-high' || config.type === 'dup-two' || config.type === 'wrong') && (
               <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}
                 className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm shrink-0">
                 <option value="all">전체 과목</option>
@@ -221,6 +308,23 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
             <input type="text" placeholder="🔍 검색..." value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="rounded-lg border-gray-300 border px-3 py-1.5 text-sm w-48 shrink-0" />
+
+            {config.type === 'wrong' && storageStats.totalSolved > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('모든 풀이 기록 및 오답 문제를 초기화하시겠습니까?')) {
+                    clearAllRecords()
+                    setProblems([])
+                    setTotal(0)
+                  }
+                }}
+                className="text-xs text-gray-400 hover:text-rose-600 px-2 py-1.5 rounded-lg border border-transparent hover:border-rose-200 hover:bg-rose-50 transition shrink-0"
+                title="풀이 기록 전체 초기화"
+              >
+                🗑️ 초기화
+              </button>
+            )}
           </div>
 
           <div className="text-sm text-gray-500 shrink-0 whitespace-nowrap">
@@ -238,10 +342,30 @@ export default function QuizPage({ config }: { config: FilterConfig }) {
         {/* 문제 영역 (스크롤) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {problems.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <div className="text-4xl mb-3">📭</div>
-              <p>조건에 맞는 문제가 없습니다</p>
-            </div>
+            config.type === 'wrong' ? (
+              <div className="text-center py-16 px-4 bg-white rounded-2xl border border-gray-200 max-w-lg mx-auto my-8 shadow-sm">
+                <div className="text-5xl mb-4">🎉</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">오답 문제가 없습니다</h3>
+                <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                  {wrongOnlyUnsolved && storageStats.totalWrong > 0
+                    ? '모든 오답 문제를 해결했습니다! \'전체 오답 이력\' 탭에서 이전 틀린 문제들을 다시 복습할 수 있습니다.'
+                    : '문제를 풀면서 틀린 문제가 생기면 이곳에 자동으로 기록됩니다.'}
+                </p>
+                <div className="flex justify-center gap-3 flex-wrap">
+                  <Link href="/cycle" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                    📋 회차별 풀기
+                  </Link>
+                  <Link href="/subject" className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+                    📚 과목별 풀기
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-16 text-gray-400">
+                <div className="text-4xl mb-3">📭</div>
+                <p>조건에 맞는 문제가 없습니다</p>
+              </div>
+            )
           ) : (
             problems.map((problem, idx) => (
               <ProblemCard

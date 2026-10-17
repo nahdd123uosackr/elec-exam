@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { Problem } from '../types/Problem'
 import { InlineMath, BlockMath } from 'react-katex'
 import MarkdownMessage from './MarkdownMessage'
+import { getRecord, saveAttempt, type ProblemAttempt } from '../lib/storage'
 
 /** 이미지/수식 렌더링 */
 function renderWithImages(text: string): React.ReactNode {
@@ -90,17 +91,39 @@ interface Props {
   problem: Problem
   index: number
   onExplain?: (problem: Problem) => void  // AI 해설 요청 콜백
+  previousAttempt?: ProblemAttempt | null
+  onAnswer?: (problemId: string, pick: number, isCorrect: boolean) => void
 }
 
-export default function ProblemCard({ problem, index, onExplain }: Props) {
+export default function ProblemCard({ problem, index, onExplain, previousAttempt, onAnswer }: Props) {
   const [pick, setPick] = useState<number | undefined>()
   const [showExplain, setShowExplain] = useState(false)
+  const [attempt, setAttempt] = useState<ProblemAttempt | null>(previousAttempt ?? null)
+
+  useEffect(() => {
+    if (previousAttempt !== undefined) {
+      setAttempt(previousAttempt)
+    } else if (problem.id) {
+      setAttempt(getRecord(problem.id))
+    }
+  }, [problem.id, previousAttempt])
 
   const qNo = parseInt((problem.문제 || '').match(/^(\d+)/)?.[1] || '0', 10)
   const problemNumber = (index ?? 0) + 1  // 1-based sequential number
   const correctAnswers = normalizeAnswer(problem.정답 || '')
   const isAnswered = pick !== undefined
   const isCorrect = isAnswered && correctAnswers.includes(pick)
+
+  const handlePick = (choiceNum: number) => {
+    if (isAnswered) return
+    setPick(choiceNum)
+    const isCorrectChoice = correctAnswers.includes(choiceNum)
+    if (problem.id) {
+      const updated = saveAttempt(problem.id, choiceNum, isCorrectChoice)
+      setAttempt(updated)
+      onAnswer?.(problem.id, choiceNum, isCorrectChoice)
+    }
+  }
 
   // 보기 분리: 마커(①②③④⑤ / 1. / 1) / (1)) 앞에서 split, 마커 반복 허용
   const rawChoices = (problem.보기 || '')
@@ -147,6 +170,29 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
               {problem.중복출제}
             </span>
           )}
+          {attempt && (
+            attempt.isCorrect ? (
+              <span
+                className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1"
+                title={`마지막 풀이: 정답 (${attempt.attemptCount}회 시도)`}
+              >
+                <span>✅ 이전 풀이: 정답</span>
+                {attempt.attemptCount > 1 && (
+                  <span className="text-emerald-600 font-normal">({attempt.attemptCount}회차)</span>
+                )}
+              </span>
+            ) : (
+              <span
+                className="rounded-full bg-rose-50 text-rose-800 border border-rose-300 px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1"
+                title={`마지막 풀이: 오답 (${attempt.lastPick}번 선택, 누적 오답 ${attempt.wrongCount}회)`}
+              >
+                <span>❌ 이전 풀이: 오답</span>
+                <span className="text-rose-600 font-normal">
+                  ({attempt.lastPick}번 선택{attempt.wrongCount > 1 ? ` · 오답 ${attempt.wrongCount}회` : ''})
+                </span>
+              </span>
+            )
+          )}
         </div>
       </div>
 
@@ -170,7 +216,7 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
             }
             return (
               <button key={ci} type="button" disabled={isAnswered}
-                onClick={() => setPick(choice.num)} className={btnClass}>
+                onClick={() => handlePick(choice.num)} className={btnClass}>
                 <span className="font-bold shrink-0 mt-0.5">{choice.label}</span>
                 {choice.text && choice.text !== choice.label ? (
                   <span className="flex-1">{renderWithImages(choice.text)}</span>
@@ -188,7 +234,7 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
               const v = e.target.value.trim()
               if (!v) return
               const n = parseInt(v, 10)
-              if (!isNaN(n) && n >= 1 && n <= 5) setPick(n)
+              if (!isNaN(n) && n >= 1 && n <= 5) handlePick(n)
             }}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
         </div>
@@ -196,10 +242,15 @@ export default function ProblemCard({ problem, index, onExplain }: Props) {
 
       {isAnswered && (
         <div className="mt-3 space-y-3 border-t pt-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`inline-block rounded-md px-3 py-1 text-sm font-bold ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {isCorrect ? '✅ 정답' : '❌ 오답'}
             </span>
+            {attempt && !attempt.isCorrect && isCorrect && (
+              <span className="rounded-md bg-amber-100 border border-amber-300 px-2.5 py-1 text-xs font-bold text-amber-800 animate-pulse">
+                🎉 오답 탈출 성공!
+              </span>
+            )}
             <span className="text-sm text-gray-600">정답:</span>
             <span className="rounded-md bg-green-50 border border-green-200 px-3 py-1 text-sm font-semibold text-green-700">
               {problem.정답 || '(미등록)'}

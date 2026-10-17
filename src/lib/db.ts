@@ -44,10 +44,20 @@ export async function queryProblems(opts: {
   search?: string
   limit?: number
   offset?: number
+  ids?: string[]
 }): Promise<{ rows: ProblemRow[]; total: number }> {
   const pool = getPool()
   const params: any[] = []
   const where: string[] = []
+
+  if (opts.ids !== undefined) {
+    const sanitizedIds = opts.ids.map(id => String(id).trim()).filter(Boolean)
+    if (sanitizedIds.length === 0) {
+      return { rows: [], total: 0 }
+    }
+    params.push(sanitizedIds)
+    where.push(`id = ANY($${params.length}::text[])`)
+  }
 
   if (opts.cycle && opts.cycle !== 'all') {
     params.push(opts.cycle)

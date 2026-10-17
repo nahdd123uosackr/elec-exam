@@ -24,25 +24,26 @@ data/
   kinz_batch*.json 등    # 과거 수집/배치 중간 산출물 (참고용)
 src/
   app/
-    page.tsx             # 홈 (통계)
+    page.tsx             # 홈 (통계 + 내 풀이 현황 + 메뉴)
     subject/page.tsx     # 과목별 풀이
     cycle/page.tsx       # 회차별 풀이
     dup-two/page.tsx     # 2회 출제 문제
     dup-high/page.tsx    # 3회 이상 출제 문제
-    api/problems/route.ts      # 목록 조회 (페이징/필터)
+    wrong/page.tsx       # 오답 문제 풀이 (틀린 문제 전용 복습)
+    api/problems/route.ts      # 목록 조회 (GET/POST 지원, ids/cycle/subject/dupCount/search 필터)
     api/problems/[id]/route.ts # 단건 조회
     api/stats/route.ts         # 통계
     api/search/route.ts        # 웹검색 (AI용)
-    api/chat/route.ts          # AI 튜터 채팅
+    api/chat/route.ts          # AI 튜터 채팅 (kilo-auto/free + 폴백)
   components/
-    ProblemCard.tsx      # 문제 카드 (보기 분리, 정답 판정, 마커 정규화)
-    QuizPage.tsx         # 풀이 화면 (API 호출 + 필터)
+    ProblemCard.tsx      # 문제 카드 (이전 풀이 뱃지 표시, 보기 분리, 정답 판정, 자동 풀이 저장)
+    QuizPage.tsx         # 풀이 화면 (헤더 오답 링크, wrong 모드 지원, API 호출 + 필터)
     ChatBot.tsx          # AI 튜터 패널 (리사이즈, localStorage)
     MarkdownMessage.tsx  # 마크다운+KaTeX 렌더러
   lib/
-    data.ts              # problems.json 직접 로드/필터 (현재 라우트는 미사용)
-    db.ts                # Postgres 쿼리 — 프로덕션 라우트가 사용
-  types/Problem.ts       # Problem 타입
+    data.ts              # problems.json 직접 로드/필터 (ids/cycle/subject 지원)
+    db.ts                # Postgres 쿼리 — 프로덕션 라우트가 사용 (ids/cycle/subject 지원)
+    storage.ts           # localStorage 기반 풀이 기록/오답 ID 추출/이벤트 구독 유틸
 scripts/                 # 수집/정제/검증 파이썬 스크립트
   verify_kinz.py            # kinz 정답/해설 수집 (Playwright, "해설" 버튼 클릭 → /exam/cA)
   extract_kinz_static.py    # kinz 지문/보기/이미지 정적 파싱
@@ -70,10 +71,18 @@ public/images/cbtbank/   # cbtbank 문제·보기 이미지 (gif, 569개)
 | `과목` / `난이도` | 분류/배지 |
 | `중복출제` | (선택) 콤마 구분 회차 목록 — **현재 JSON에 없음** → dup-two/dup-high 필터는 빈 결과 |
 
-### UI 판정 로직 (ProblemCard.tsx)
+### UI 판정 및 학습 기록 로직
 - 보기: 개행 단위 split → 중복 마커(`① ①`), `1. ①`, `1.` 접두어 제거 → 4버튼 생성
 - 정답: `①`~`⑤` / 숫자 / 콤마 복수 허용
 - 이미지 마커: `[이미지: /images/...]` → `<img>`, LaTeX가 들어 있으면 KaTeX로 렌더
+- **풀이 기록 자동 저장 (`src/lib/storage.ts`)**:
+  - 문제를 풀 때마다 정답/오답 여부, 선택 번호, 시도 횟수, 오답 횟수를 `localStorage` (`elec_exam_records_v1`)에 영구 저장
+  - `ProblemCard` 상단에 이전 풀이 뱃지 실시간 표시 (`✅ 이전 풀이: 정답`, `❌ 이전 풀이: 오답`)
+  - 오답이었던 문제를 다시 맞히면 `🎉 오답 탈출 성공!` 축하 뱃지 표시
+- **오답 문제 복습 모드 (`/wrong`)**:
+  - 저장소의 오답 ID 목록을 읽어 `POST /api/problems`로 필터링 조회
+  - 미해결 오답 / 전체 오답 이력 탭 전환, 회차/과목/검색 연동, 오답 노트 전체 초기화 지원
+  - 메인 페이지 및 헤더에 실시간 오답 개수 카운터 뱃지 제공
 
 ## 데이터 수정 원칙 (작업 시 반드시 준수)
 1. **원본 우선**: 정답/보기/지문이 틀렸을 때는 `data/verified_*` 수집본을 근거로 교체한다. 추측으로 바꾸지 않는다.
