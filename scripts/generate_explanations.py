@@ -184,7 +184,7 @@ def main():
     from_src = from_ai = failed = 0
     pending = {}
     for n, p in enumerate(targets, 1):
-        src_ex = find_source_explanation(p, srcmap)
+        src_ex = None if os.environ.get("FORCE_AI") == "1" else find_source_explanation(p, srcmap)
         if src_ex:
             pending[p["id"]] = src_ex
             from_src += 1
